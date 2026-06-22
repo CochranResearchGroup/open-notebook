@@ -1,9 +1,11 @@
 """Tests for the sources API endpoint."""
 
 import os
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from open_notebook.config import UPLOADS_FOLDER
@@ -212,6 +214,91 @@ class TestGetSourceNotFound:
         response = client.get("/api/sources/source:gone")
 
         assert response.status_code == 404
+
+
+class TestSourceFilePathContainment:
+    """Download guards must reject sibling-prefix paths outside uploads."""
+
+    @pytest.mark.asyncio
+    @patch("api.routers.sources.Source.get", new_callable=AsyncMock)
+    async def test_download_rejects_sibling_prefix_path(self, mock_get, tmp_path, monkeypatch):
+        from api.routers import sources
+
+        uploads = tmp_path / "uploads"
+        sibling = tmp_path / "uploads_evil"
+        uploads.mkdir()
+        sibling.mkdir()
+        outside_file = sibling / "leak.txt"
+        outside_file.write_text("not in uploads")
+
+        source = MagicMock()
+        source.asset = MagicMock(file_path=str(outside_file))
+        mock_get.return_value = source
+        monkeypatch.setattr(sources, "UPLOADS_FOLDER", str(uploads))
+
+        with pytest.raises(HTTPException) as exc_info:
+            await sources._resolve_source_file("source:1")
+
+        assert exc_info.value.status_code == 403
+
+    def test_file_available_rejects_sibling_prefix_path(self, tmp_path, monkeypatch):
+        from api.routers import sources
+
+        uploads = tmp_path / "uploads"
+        sibling = tmp_path / "uploads_evil"
+        uploads.mkdir()
+        sibling.mkdir()
+        outside_file = sibling / "leak.txt"
+        outside_file.write_text("not in uploads")
+
+        source = MagicMock()
+        source.asset = MagicMock(file_path=str(outside_file))
+        monkeypatch.setattr(sources, "UPLOADS_FOLDER", str(uploads))
+
+        assert sources._is_source_file_available(source) is False
+
+    @pytest.mark.asyncio
+    @patch("api.routers.sources.Source.get", new_callable=AsyncMock)
+    async def test_download_allows_file_inside_uploads(self, mock_get, tmp_path, monkeypatch):
+        from api.routers import sources
+
+        uploads = tmp_path / "uploads"
+        uploads.mkdir()
+        uploaded_file = uploads / "source.txt"
+        uploaded_file.write_text("ok")
+
+        source = MagicMock()
+        source.asset = MagicMock(file_path=str(uploaded_file))
+        mock_get.return_value = source
+        monkeypatch.setattr(sources, "UPLOADS_FOLDER", str(uploads))
+
+        resolved_path, filename = await sources._resolve_source_file("source:1")
+
+        assert Path(resolved_path) == uploaded_file
+        assert filename == "source.txt"
+
+
+class TestDocsAuthentication:
+    """API docs should be protected when password auth is configured."""
+
+    def test_docs_require_auth_when_password_is_set(self, monkeypatch):
+        monkeypatch.setenv("OPEN_NOTEBOOK_PASSWORD", "test-password")
+
+        from api.auth import PasswordAuthMiddleware
+
+        middleware = PasswordAuthMiddleware(
+            app=lambda scope, receive, send: None,
+            excluded_paths=[
+                "/",
+                "/health",
+                "/api/auth/status",
+                "/api/config",
+            ],
+        )
+
+        assert "/docs" not in middleware.excluded_paths
+        assert "/openapi.json" not in middleware.excluded_paths
+        assert "/redoc" not in middleware.excluded_paths
 
 
 if __name__ == "__main__":

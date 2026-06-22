@@ -117,7 +117,7 @@ services:
     command: start --log info --user root --pass root rocksdb:/mydata/mydatabase.db
     user: root
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - ./surreal_data:/mydata
     restart: always
@@ -128,7 +128,9 @@ services:
       - "8502:8502"
       - "5055:5055"
     environment:
-      - OPEN_NOTEBOOK_ENCRYPTION_KEY=change-me-to-a-secret-string
+      - OPEN_NOTEBOOK_ENCRYPTION_KEY=${OPEN_NOTEBOOK_ENCRYPTION_KEY:?Set OPEN_NOTEBOOK_ENCRYPTION_KEY in .env}
+      - OPEN_NOTEBOOK_PASSWORD=${OPEN_NOTEBOOK_PASSWORD:?Set OPEN_NOTEBOOK_PASSWORD in .env}
+      - CORS_ORIGINS=${CORS_ORIGINS:?Set CORS_ORIGINS in .env}
       - SURREAL_URL=ws://surrealdb:8000/rpc
       - SURREAL_USER=root
       - SURREAL_PASSWORD=root
@@ -141,12 +143,13 @@ services:
     restart: always
 ```
 
-### Step 2: Set Your Encryption Key
-Edit `docker-compose.yml` and change this line:
-```yaml
-- OPEN_NOTEBOOK_ENCRYPTION_KEY=change-me-to-a-secret-string
+### Step 2: Set Your Secrets
+Create a `.env` file next to `docker-compose.yml`:
+```bash
+OPEN_NOTEBOOK_ENCRYPTION_KEY=my-super-secret-key-123
+OPEN_NOTEBOOK_PASSWORD=my-super-secret-password-123
+CORS_ORIGINS=http://localhost:8502
 ```
-to any secret value (e.g., `my-super-secret-key-123`)
 
 ### Step 3: Start Services
 ```bash
@@ -169,6 +172,14 @@ Done! You're ready to create your first notebook.
 > [OpenAI](https://platform.openai.com/api-keys) · [Anthropic](https://console.anthropic.com/) · [Google](https://aistudio.google.com/) · [Groq](https://console.groq.com/) (free tier)
 
 > **Want free local AI?** See [examples/docker-compose-ollama.yml](examples/) for Ollama setup
+
+> **Want to use Codex App Server?** Build the single-container image with
+> `--build-arg INSTALL_CODEX_CLI=true`, set `OPEN_NOTEBOOK_CODEX_HOME` to a
+> Codex home that has already authenticated, then open **Models** and use the
+> **Codex App Server** provider card to inspect runtime status, sync/register
+> the configured model, test it, and set it as the language default. This
+> provider is language-only and uses a non-interactive Codex app-server turn for
+> each LLM call.
 
 ---
 
@@ -218,6 +229,7 @@ Thanks to the [Esperanto](https://github.com/lfnovo/esperanto) library, we suppo
 | DashScope (Qwen) | ✅          | ❌               | ❌             | ❌             |
 | MiniMax      | ✅          | ❌               | ❌             | ❌             |
 | OpenAI Compatible* | ✅          | ✅               | ✅             | ✅             |
+| Codex App Server | ✅          | ❌               | ❌             | ❌             |
 
 *Supports LM Studio and any OpenAI-compatible endpoint
 

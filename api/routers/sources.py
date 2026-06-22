@@ -594,34 +594,41 @@ async def _resolve_source_file(source_id: str) -> tuple[str, str]:
     if not file_path:
         raise HTTPException(status_code=404, detail="Source has no file to download")
 
-    safe_root = os.path.realpath(UPLOADS_FOLDER)
-    resolved_path = os.path.realpath(file_path)
+    safe_root = Path(UPLOADS_FOLDER).resolve()
+    resolved_path = Path(file_path).resolve()
 
-    if not resolved_path.startswith(safe_root):
+    if not _is_path_within_directory(resolved_path, safe_root):
         logger.warning(
             f"Blocked download outside uploads directory for source {source_id}: {resolved_path}"
         )
         raise HTTPException(status_code=403, detail="Access to file denied")
 
-    if not os.path.exists(resolved_path):
+    if not resolved_path.exists():
         raise HTTPException(status_code=404, detail="File not found on server")
 
-    filename = os.path.basename(resolved_path)
-    return resolved_path, filename
+    filename = resolved_path.name
+    return str(resolved_path), filename
 
 
 def _is_source_file_available(source: Source) -> Optional[bool]:
     if not source or not source.asset or not source.asset.file_path:
         return None
 
-    file_path = source.asset.file_path
-    safe_root = os.path.realpath(UPLOADS_FOLDER)
-    resolved_path = os.path.realpath(file_path)
+    safe_root = Path(UPLOADS_FOLDER).resolve()
+    resolved_path = Path(source.asset.file_path).resolve()
 
-    if not resolved_path.startswith(safe_root):
+    if not _is_path_within_directory(resolved_path, safe_root):
         return False
 
-    return os.path.exists(resolved_path)
+    return resolved_path.exists()
+
+
+def _is_path_within_directory(path: Path, directory: Path) -> bool:
+    try:
+        path.relative_to(directory)
+        return True
+    except ValueError:
+        return False
 
 
 @router.get("/sources/{source_id}", response_model=SourceResponse)

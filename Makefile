@@ -23,7 +23,10 @@ frontend:
 	cd frontend && npm run dev
 
 lint:
-	uv run python -m mypy .
+	uv run ruff check .
+
+typecheck:
+	uv run --extra dev python -m mypy .
 
 ruff:
 	ruff check . --fix

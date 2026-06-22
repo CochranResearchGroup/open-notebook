@@ -19,13 +19,7 @@ class PasswordAuthMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, excluded_paths: Optional[list] = None):
         super().__init__(app)
         self.password = get_secret_from_env("OPEN_NOTEBOOK_PASSWORD")
-        self.excluded_paths = excluded_paths or [
-            "/",
-            "/health",
-            "/docs",
-            "/openapi.json",
-            "/redoc",
-        ]
+        self.excluded_paths = excluded_paths or ["/", "/health"]
 
     async def dispatch(self, request: Request, call_next):
         # Skip authentication if no password is set
