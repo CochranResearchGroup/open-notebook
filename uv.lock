@@ -2101,6 +2101,7 @@ dependencies = [
     { name = "content-core" },
     { name = "esperanto" },
     { name = "fastapi" },
+    { name = "fastmcp" },
     { name = "httpx", extra = ["socks"] },
     { name = "langchain" },
     { name = "langchain-anthropic" },
@@ -2139,6 +2140,7 @@ dev = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "mypy" },
     { name = "pre-commit" },
     { name = "pytest-asyncio" },
     { name = "ruff" },
@@ -2152,6 +2154,7 @@ requires-dist = [
     { name = "content-core", specifier = ">=1.14.1,<2" },
     { name = "esperanto", specifier = ">=2.20.0,<3" },
     { name = "fastapi", specifier = ">=0.104.0" },
+    { name = "fastmcp", specifier = ">=3.2.0,<4" },
     { name = "httpx", extras = ["socks"], specifier = ">=0.27.0" },
     { name = "ipykernel", marker = "extra == 'dev'", specifier = ">=6.29.5" },
     { name = "ipywidgets", marker = "extra == 'dev'", specifier = ">=8.1.5" },
@@ -2187,6 +2190,7 @@ provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "mypy", specifier = ">=1.11.1" },
     { name = "pre-commit", specifier = ">=4.1.0" },
     { name = "pytest-asyncio", specifier = ">=1.2.0" },
     { name = "ruff", specifier = ">=0.14.13" },

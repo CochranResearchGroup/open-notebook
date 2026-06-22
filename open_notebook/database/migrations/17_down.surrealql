@@ -1,0 +1,3 @@
+-- Migration 17 rollback: remove MCP tool-call audit records.
+
+REMOVE TABLE IF EXISTS mcp_tool_audit;

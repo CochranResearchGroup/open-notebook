@@ -41,7 +41,11 @@ dependencies = [
     "numpy>=2.4.1",
     "pycountry>=26.2.16",
     "babel>=2.18.0",
+    "fastmcp>=3.2.0,<4",
 ]
+
+[project.scripts]
+open-notebook-mcp = "open_notebook.mcp_server:main"
 
 [tool.setuptools]
 package-dir = {"open_notebook" = "open_notebook"}
@@ -67,6 +71,7 @@ build-backend = "setuptools.build_meta"
 
 [dependency-groups]
 dev = [
+    "mypy>=1.11.1",
     "pre-commit>=4.1.0",
     "pytest-asyncio>=1.2.0",
     "ruff>=0.14.13",

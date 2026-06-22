@@ -24,6 +24,7 @@ from api.routers import (
     episode_profiles,
     insights,
     languages,
+    mcp_servers,
     models,
     notebooks,
     notes,
@@ -170,16 +171,14 @@ if CORS_IS_DEFAULT_WILDCARD:
 else:
     logger.info(f"CORS allowed origins: {CORS_ALLOWED_ORIGINS}")
 
-# Add password authentication middleware first
-# Exclude /api/auth/status and /api/config from authentication
+# Add password authentication middleware first.
+# Keep only health/config bootstrap endpoints public. API docs expose the full
+# endpoint surface and should be protected whenever password auth is enabled.
 app.add_middleware(
     PasswordAuthMiddleware,
     excluded_paths=[
         "/",
         "/health",
-        "/docs",
-        "/openapi.json",
-        "/redoc",
         "/api/auth/status",
         "/api/config",
     ],
@@ -291,6 +290,7 @@ app.include_router(auth.router, prefix="/api", tags=["auth"])
 app.include_router(config.router, prefix="/api", tags=["config"])
 app.include_router(notebooks.router, prefix="/api", tags=["notebooks"])
 app.include_router(search.router, prefix="/api", tags=["search"])
+app.include_router(mcp_servers.router, prefix="/api", tags=["mcp"])
 app.include_router(models.router, prefix="/api", tags=["models"])
 app.include_router(transformations.router, prefix="/api", tags=["transformations"])
 app.include_router(notes.router, prefix="/api", tags=["notes"])

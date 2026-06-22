@@ -1,0 +1,16 @@
+-- Migration 17: Audit local MCP tool-call attempts.
+
+DEFINE TABLE IF NOT EXISTS mcp_tool_audit SCHEMAFULL;
+
+DEFINE FIELD IF NOT EXISTS server_id ON TABLE mcp_tool_audit TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS server_name ON TABLE mcp_tool_audit TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS tool_name ON TABLE mcp_tool_audit TYPE string;
+DEFINE FIELD IF NOT EXISTS permission ON TABLE mcp_tool_audit TYPE string;
+DEFINE FIELD IF NOT EXISTS caller ON TABLE mcp_tool_audit TYPE string;
+DEFINE FIELD IF NOT EXISTS status ON TABLE mcp_tool_audit TYPE string;
+DEFINE FIELD IF NOT EXISTS error ON TABLE mcp_tool_audit TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS argument_summary ON TABLE mcp_tool_audit FLEXIBLE TYPE object;
+DEFINE FIELD IF NOT EXISTS result_summary ON TABLE mcp_tool_audit FLEXIBLE TYPE object;
+
+DEFINE FIELD IF NOT EXISTS created ON mcp_tool_audit DEFAULT time::now() VALUE $before OR time::now();
+DEFINE FIELD IF NOT EXISTS updated ON mcp_tool_audit DEFAULT time::now() VALUE time::now();

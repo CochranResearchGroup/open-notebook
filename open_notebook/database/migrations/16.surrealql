@@ -1,0 +1,23 @@
+-- Migration 16: Store local MCP server configuration.
+-- Env values are intended for non-secret process settings. Secrets should stay
+-- in the existing environment or credential mechanisms and be referenced by name.
+
+DEFINE TABLE IF NOT EXISTS mcp_server_config SCHEMAFULL;
+
+DEFINE FIELD IF NOT EXISTS name ON TABLE mcp_server_config TYPE string;
+DEFINE FIELD IF NOT EXISTS transport ON TABLE mcp_server_config TYPE string;
+DEFINE FIELD IF NOT EXISTS command ON TABLE mcp_server_config TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS args ON TABLE mcp_server_config TYPE array<string>;
+DEFINE FIELD IF NOT EXISTS env ON TABLE mcp_server_config FLEXIBLE TYPE object;
+DEFINE FIELD IF NOT EXISTS url ON TABLE mcp_server_config TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS auth_env_var ON TABLE mcp_server_config TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS enabled ON TABLE mcp_server_config TYPE bool DEFAULT true;
+DEFINE FIELD IF NOT EXISTS allowed_tools ON TABLE mcp_server_config TYPE array<string>;
+DEFINE FIELD IF NOT EXISTS disabled_tools ON TABLE mcp_server_config TYPE array<string>;
+DEFINE FIELD IF NOT EXISTS tool_permissions ON TABLE mcp_server_config FLEXIBLE TYPE object;
+DEFINE FIELD IF NOT EXISTS timeout ON TABLE mcp_server_config TYPE int DEFAULT 30;
+DEFINE FIELD IF NOT EXISTS concurrency ON TABLE mcp_server_config TYPE int DEFAULT 1;
+DEFINE FIELD IF NOT EXISTS metadata ON TABLE mcp_server_config FLEXIBLE TYPE object;
+
+DEFINE FIELD IF NOT EXISTS created ON mcp_server_config DEFAULT time::now() VALUE $before OR time::now();
+DEFINE FIELD IF NOT EXISTS updated ON mcp_server_config DEFAULT time::now() VALUE time::now();

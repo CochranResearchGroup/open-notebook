@@ -13,6 +13,8 @@ from open_notebook.exceptions import (
     NotFoundError,
 )
 from open_notebook.graphs.chat import graph as chat_graph
+from open_notebook.mcp_chat import build_mcp_augmented_chat_message
+from open_notebook.mcp_client import MCPClientError
 from open_notebook.utils.graph_utils import get_session_message_count
 
 router = APIRouter()
@@ -240,6 +242,8 @@ async def get_session(session_id: str):
             messages=messages,
             model_override=getattr(session, "model_override", None),
         )
+    except (ValueError, MCPClientError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except NotFoundError:
         raise HTTPException(status_code=404, detail="Session not found")
     except Exception as e:
@@ -375,7 +379,8 @@ async def execute_chat(request: ExecuteChatRequest):
         # Add user message to state
         from langchain_core.messages import HumanMessage
 
-        user_message = HumanMessage(content=request.message)
+        message_content = await build_mcp_augmented_chat_message(request.message)
+        user_message = HumanMessage(content=message_content)
         state_values["messages"].append(user_message)
 
         # Execute chat graph

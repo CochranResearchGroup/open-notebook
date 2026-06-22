@@ -1,0 +1,3 @@
+-- Migration 16 rollback: remove local MCP server configuration.
+
+REMOVE TABLE IF EXISTS mcp_server_config;

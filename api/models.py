@@ -101,6 +101,176 @@ class ProviderAvailabilityResponse(BaseModel):
     )
 
 
+class CodexAppServerStatusResponse(BaseModel):
+    provider: str
+    enabled: bool
+    available: bool
+    cli_found: bool
+    help_ok: bool
+    help_error: Optional[str] = None
+    codex_bin: str
+    codex_bin_path: Optional[str] = None
+    profile: str
+    codex_home_configured: bool
+    codex_home_label: Optional[str] = None
+    model: str
+    cwd: str
+    effort: str
+    sandbox: str
+    timeout: int
+    registered_model_id: Optional[str] = None
+    default_slots: Dict[str, bool] = Field(default_factory=dict)
+
+
+class CodexAppServerDefaultsResponse(BaseModel):
+    model_id: str
+    default_chat_model: str
+    default_transformation_model: str
+    large_context_model: str
+    default_tools_model: str
+
+
+class CodexMCPServerSummary(BaseModel):
+    id: Optional[str] = None
+    name: str
+    transport: str
+    enabled: bool
+    codex_native_supported: bool
+    has_mutating_classification: bool
+    env_keys: List[str] = Field(default_factory=list)
+
+
+class CodexMCPProfileResponse(BaseModel):
+    mode: Literal["none", "read_only", "selected", "custom"]
+    selected_server_ids: List[str] = Field(default_factory=list)
+    custom_profile_name: Optional[str] = None
+    available_servers: List[CodexMCPServerSummary] = Field(default_factory=list)
+    codex_config_toml: str = ""
+    warnings: List[str] = Field(default_factory=list)
+
+
+class CodexMCPProfileUpdate(BaseModel):
+    mode: Literal["none", "read_only", "selected", "custom"]
+    selected_server_ids: List[str] = Field(default_factory=list)
+    custom_profile_name: Optional[str] = None
+
+
+class MCPServerBase(BaseModel):
+    name: str = Field(..., description="Display name for the MCP server")
+    transport: Literal["stdio", "http", "sse", "websocket"] = Field(
+        "stdio", description="MCP transport"
+    )
+    command: Optional[str] = Field(
+        None, description="Command for stdio MCP servers"
+    )
+    args: List[str] = Field(
+        default_factory=list, description="Command arguments for stdio MCP servers"
+    )
+    env: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Non-secret environment variables for the MCP process",
+    )
+    url: Optional[str] = Field(None, description="URL for network MCP transports")
+    auth_env_var: Optional[str] = Field(
+        None, description="Environment variable name containing auth material"
+    )
+    enabled: bool = Field(True, description="Whether this server is enabled")
+    allowed_tools: List[str] = Field(
+        default_factory=list, description="If set, only these tools are enabled"
+    )
+    disabled_tools: List[str] = Field(
+        default_factory=list, description="Tools explicitly disabled"
+    )
+    tool_permissions: Dict[str, Literal["read", "mutate", "disabled"]] = Field(
+        default_factory=dict,
+        description="Per-tool permission classification",
+    )
+    timeout: int = Field(30, ge=1, le=300, description="Timeout in seconds")
+    concurrency: int = Field(1, ge=1, le=10, description="Maximum concurrent calls")
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class MCPServerCreate(MCPServerBase):
+    pass
+
+
+class MCPServerUpdate(BaseModel):
+    name: Optional[str] = None
+    transport: Optional[Literal["stdio", "http", "sse", "websocket"]] = None
+    command: Optional[str] = None
+    args: Optional[List[str]] = None
+    env: Optional[Dict[str, str]] = None
+    url: Optional[str] = None
+    auth_env_var: Optional[str] = None
+    enabled: Optional[bool] = None
+    allowed_tools: Optional[List[str]] = None
+    disabled_tools: Optional[List[str]] = None
+    tool_permissions: Optional[Dict[str, Literal["read", "mutate", "disabled"]]] = None
+    timeout: Optional[int] = Field(None, ge=1, le=300)
+    concurrency: Optional[int] = Field(None, ge=1, le=10)
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class MCPServerResponse(MCPServerBase):
+    id: Optional[str] = None
+    env_keys: List[str] = Field(
+        default_factory=list,
+        description="Stored environment variable names without values",
+    )
+
+
+class MCPToolResponse(BaseModel):
+    name: str
+    description: Optional[str] = None
+    input_schema: Dict[str, Any] = Field(default_factory=dict)
+    enabled: bool
+    permission: Literal["read", "mutate", "disabled"]
+
+
+class MCPServerTestResponse(BaseModel):
+    success: bool
+    message: str
+    tools: List[MCPToolResponse] = Field(default_factory=list)
+
+
+class MCPToolCallRequest(BaseModel):
+    server_id: str = Field(..., description="Configured MCP server ID")
+    tool_name: str = Field(..., description="MCP tool name to call")
+    arguments: Dict[str, Any] = Field(
+        default_factory=dict, description="Tool arguments as a JSON object"
+    )
+    allow_mutation: bool = Field(
+        False,
+        description="Allow tools classified as mutating to run. Keep false for chat workflows.",
+    )
+
+
+class MCPToolCallResponse(BaseModel):
+    success: bool
+    message: str
+    tool_name: str
+    permission: Literal["read", "mutate", "disabled"]
+    is_error: bool = False
+    content: List[Dict[str, Any]] = Field(default_factory=list)
+    text: str = ""
+    truncated: bool = False
+
+
+class MCPToolAuditResponse(BaseModel):
+    id: Optional[str] = None
+    server_id: Optional[str] = None
+    server_name: Optional[str] = None
+    tool_name: str
+    permission: Literal["read", "mutate", "disabled"]
+    caller: str
+    status: Literal["success", "failed"]
+    error: Optional[str] = None
+    argument_summary: Dict[str, Any] = Field(default_factory=dict)
+    result_summary: Dict[str, Any] = Field(default_factory=dict)
+    created: Optional[str] = None
+    updated: Optional[str] = None
+
+
 # Transformations API models
 class TransformationCreate(BaseModel):
     name: str = Field(..., description="Transformation name")
