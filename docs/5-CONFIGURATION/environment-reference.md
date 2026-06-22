@@ -59,6 +59,26 @@ Comprehensive list of all environment variables available in Open Notebook.
 | `ESPERANTO_SSL_VERIFY` | No | true | Verify SSL certificates (false = development only) |
 | `ESPERANTO_SSL_CA_BUNDLE` | No | None | Path to custom CA certificate bundle |
 
+## Codex App Server Provider
+
+These settings enable the optional `codex_app_server` language-model provider. The
+Models settings page shows runtime status, can sync/register the configured
+model, can test it, and can assign it to the language default slots.
+
+| Variable | Required? | Default | Description |
+|----------|-----------|---------|-------------|
+| `OPEN_NOTEBOOK_CODEX_APP_SERVER_ENABLED` | No | enabled unless set false | Set to `false`, `0`, `no`, or `off` to hide/disable the provider. |
+| `OPEN_NOTEBOOK_CODEX_BIN` | No | `codex` | Codex CLI executable path or command name. |
+| `OPEN_NOTEBOOK_CODEX_PROFILE` | No | empty | Optional Codex profile passed to the CLI. |
+| `OPEN_NOTEBOOK_CODEX_HOME` | Recommended | Codex default | Codex home directory containing authenticated Codex config/auth. Do not commit this directory. |
+| `OPEN_NOTEBOOK_CODEX_APP_SERVER_MODEL` | No | `gpt-5.5` | Model registered and used by Open Notebook for the Codex provider. |
+| `OPEN_NOTEBOOK_CODEX_APP_SERVER_CWD` | No | `/tmp/open-notebook-codex-app-server-cwd` | Working directory for ephemeral Codex turns. |
+| `OPEN_NOTEBOOK_CODEX_APP_SERVER_EFFORT` | No | `medium` | Codex reasoning effort. |
+| `OPEN_NOTEBOOK_CODEX_APP_SERVER_SANDBOX` | No | `read-only` | Codex sandbox mode for Open Notebook LLM calls. |
+| `OPEN_NOTEBOOK_CODEX_APP_SERVER_TIMEOUT` | No | `900` | Timeout in seconds for app-server calls. |
+| `OPEN_NOTEBOOK_CODEX_APP_SERVER_MCP_PROFILE_NAME` | No | `open-notebook-mcp` | Managed Codex profile name reserved for future file-based MCP profile materialization. |
+| `OPEN_NOTEBOOK_CODEX_APP_SERVER_DYNAMIC_TOOLS` | No | false | Opt in to experimental Codex app-server dynamic tool advertising. Disabled by default; Codex-native MCP launch config is used first for selected MCP servers. |
+
 ---
 
 ## Embeddings

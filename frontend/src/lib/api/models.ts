@@ -9,6 +9,10 @@ import {
   AllProvidersSyncResult,
   ProviderModelCount,
   AutoAssignResult,
+  CodexAppServerDefaults,
+  CodexAppServerStatus,
+  CodexMCPProfile,
+  CodexMCPProfileUpdate,
   ModelTestResult,
 } from '@/lib/types/models'
 
@@ -101,6 +105,31 @@ export const modelsApi = {
    */
   testModel: async (modelId: string): Promise<ModelTestResult> => {
     const response = await apiClient.post<ModelTestResult>(`/models/${modelId}/test`)
+    return response.data
+  },
+
+  getCodexAppServerStatus: async () => {
+    const response = await apiClient.get<CodexAppServerStatus>('/models/codex-app-server/status')
+    return response.data
+  },
+
+  syncCodexAppServer: async () => {
+    const response = await apiClient.post<ProviderSyncResult>('/models/codex-app-server/sync')
+    return response.data
+  },
+
+  setCodexAppServerDefaults: async () => {
+    const response = await apiClient.post<CodexAppServerDefaults>('/models/codex-app-server/set-language-defaults')
+    return response.data
+  },
+
+  getCodexMCPProfile: async () => {
+    const response = await apiClient.get<CodexMCPProfile>('/models/codex-app-server/mcp-profile')
+    return response.data
+  },
+
+  updateCodexMCPProfile: async (data: CodexMCPProfileUpdate) => {
+    const response = await apiClient.put<CodexMCPProfile>('/models/codex-app-server/mcp-profile', data)
     return response.data
   },
 }

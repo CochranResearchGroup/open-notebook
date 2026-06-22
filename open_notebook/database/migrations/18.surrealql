@@ -1,0 +1,7 @@
+-- Migration 18: Store Codex App Server MCP profile preferences.
+
+CREATE open_notebook:codex_mcp_profile CONTENT {
+    mode: "none",
+    selected_server_ids: [],
+    custom_profile_name: NONE
+};

@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from 'next/server'
  *
  * Auto-detection logic for API_URL:
  * 1. If API_URL env var is set, use it (explicit override)
+ *    Set API_URL=relative to force same-origin /api calls behind a reverse proxy.
  * 2. Otherwise, detect from incoming HTTP request headers (zero-config)
  * 3. Fallback to localhost:5055 if detection fails
  *
@@ -27,6 +28,12 @@ export async function GET(request: NextRequest) {
   const envApiUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL
 
   if (envApiUrl) {
+    if (envApiUrl === 'relative' || envApiUrl === '__relative__') {
+      return NextResponse.json({
+        apiUrl: '',
+      })
+    }
+
     return NextResponse.json({
       apiUrl: envApiUrl,
     })

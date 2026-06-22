@@ -16,6 +16,7 @@ from loguru import logger
 # Test models for each provider - uses minimal/cheapest models for testing
 # Format: (model_name, model_type)
 TEST_MODELS = {
+    "codex_app_server": (None, "language"),
     "openai": ("gpt-3.5-turbo", "language"),
     "anthropic": ("claude-3-haiku-20240307", "language"),
     "google": ("gemini-2.0-flash", "language"),
@@ -273,9 +274,7 @@ async def test_individual_model(model) -> Tuple[bool, str]:
             return False, "Could not create model instance"
 
         if model.type == "language":
-            response = await esp_model.achat_complete(
-                messages=[{"role": "user", "content": "Hi!"}]
-            )
+            response = await esp_model.achat_complete(messages=[{"role": "user", "content": "Hi!"}])
             text = response.content[:100] if response.content else "(empty response)"
             return True, f"Response: {text}"
 

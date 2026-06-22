@@ -13,7 +13,15 @@ from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.domain.base import ObjectModel, RecordModel
 from open_notebook.exceptions import ConfigurationError
 
-ModelType = Union[LanguageModel, EmbeddingModel, SpeechToTextModel, TextToSpeechModel]
+from .codex_app_server import CODEX_APP_SERVER_PROVIDER, CodexAppServerLanguageModel
+
+ModelType = Union[
+    LanguageModel,
+    EmbeddingModel,
+    SpeechToTextModel,
+    TextToSpeechModel,
+    CodexAppServerLanguageModel,
+]
 
 
 class Model(ObjectModel):
@@ -143,6 +151,11 @@ class ModelManager:
 
         # Merge any additional kwargs (e.g. temperature)
         config.update(kwargs)
+
+        if model.provider == CODEX_APP_SERVER_PROVIDER:
+            if model.type != "language":
+                raise ConfigurationError("Codex app-server only supports language models")
+            return CodexAppServerLanguageModel(model_name=model.name, config=config)
 
         # Normalize provider name: DB stores underscores but Esperanto expects hyphens
         provider = model.provider.replace("_", "-")

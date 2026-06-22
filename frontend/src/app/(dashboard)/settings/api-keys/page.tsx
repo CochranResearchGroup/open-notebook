@@ -39,7 +39,7 @@ import {
   Bot,
 } from 'lucide-react'
 import { useTranslation } from '@/lib/hooks/use-translation'
-import { useModels, useDeleteModel, useModelDefaults, useUpdateModelDefaults, useAutoAssignDefaults, useTestModel } from '@/lib/hooks/use-models'
+import { useModels, useDeleteModel, useModelDefaults, useUpdateModelDefaults, useAutoAssignDefaults, useTestModel, useCodexAppServerStatus, useSyncCodexAppServer, useSetCodexAppServerDefaults, useCodexMCPProfile, useUpdateCodexMCPProfile } from '@/lib/hooks/use-models'
 import {
   useCredentials,
   useCredential,
@@ -51,14 +51,14 @@ import {
   useTestCredential,
   useDiscoverModels,
   useRegisterModels,
-  useMigrateFromEnv,
 } from '@/lib/hooks/use-credentials'
 import { Credential, CreateCredentialRequest, UpdateCredentialRequest, DiscoveredModel } from '@/lib/api/credentials'
-import { Model, ModelDefaults } from '@/lib/types/models'
+import { CodexMCPProfileMode, Model, ModelDefaults } from '@/lib/types/models'
 import { MigrationBanner, ModelTestResultDialog } from '@/components/settings'
 import { EmbeddingModelChangeDialog } from '@/components/settings/EmbeddingModelChangeDialog'
 
 type ModelType = 'language' | 'embedding' | 'text_to_speech' | 'speech_to_text'
+const CODEX_APP_SERVER_PROVIDER = 'codex_app_server'
 
 // Provider display names
 const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
@@ -77,6 +77,7 @@ const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   azure: 'Azure OpenAI',
   vertex: 'Google Vertex AI',
   openai_compatible: 'OpenAI Compatible',
+  codex_app_server: 'Codex App Server',
   dashscope: 'DashScope (Qwen)',
   minimax: 'MiniMax',
 }
@@ -85,7 +86,7 @@ const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
 const ALL_PROVIDERS = [
   'openai', 'anthropic', 'google', 'groq', 'mistral', 'deepseek',
   'xai', 'openrouter', 'dashscope', 'minimax', 'voyage', 'elevenlabs', 'deepgram', 'ollama',
-  'azure', 'vertex', 'openai_compatible',
+  'azure', 'vertex', 'openai_compatible', CODEX_APP_SERVER_PROVIDER,
 ]
 
 // Default modalities per provider
@@ -105,6 +106,7 @@ const PROVIDER_MODALITIES: Record<string, ModelType[]> = {
   azure: ['language', 'embedding', 'text_to_speech', 'speech_to_text'],
   vertex: ['language', 'embedding', 'text_to_speech'],
   openai_compatible: ['language', 'embedding', 'text_to_speech', 'speech_to_text'],
+  codex_app_server: ['language'],
   dashscope: ['language'],
   minimax: ['language'],
 }
@@ -125,6 +127,7 @@ const PROVIDER_DOCS: Record<string, string> = {
   azure: 'https://portal.azure.com/#view/Microsoft_Azure_ProjectOxford/CognitiveServicesHub/~/OpenAI',
   vertex: 'https://cloud.google.com/vertex-ai/docs/start/cloud-environment',
   openai_compatible: 'https://github.com/lfnovo/open-notebook/blob/main/docs/5-CONFIGURATION/openai-compatible.md',
+  codex_app_server: 'https://github.com/lfnovo/open-notebook/blob/main/README.md#ai-provider-setup',
   dashscope: 'https://help.aliyun.com/zh/model-studio/getting-started/',
   minimax: 'https://platform.minimaxi.com/document/Guides',
 }
@@ -996,6 +999,275 @@ function CredentialItem({
 // Provider Section (shows all credentials for a provider)
 // =============================================================================
 
+function CodexAppServerPanel({
+  models,
+  defaults,
+}: {
+  models: Model[]
+  defaults: ModelDefaults | null
+}) {
+  const { data: status, isLoading } = useCodexAppServerStatus()
+  const syncCodex = useSyncCodexAppServer()
+  const setDefaults = useSetCodexAppServerDefaults()
+  const { data: mcpProfile, isLoading: isMcpProfileLoading } = useCodexMCPProfile()
+  const updateMcpProfile = useUpdateCodexMCPProfile()
+  const { testModel, isPending: isModelTestPending, testingModelId, testResult, testedModelName, clearResult } = useTestModel()
+  const [mcpMode, setMcpMode] = useState<CodexMCPProfileMode>('none')
+  const [selectedMcpServerIds, setSelectedMcpServerIds] = useState<string[]>([])
+
+  useEffect(() => {
+    if (mcpProfile) {
+      setMcpMode(mcpProfile.mode)
+      setSelectedMcpServerIds(mcpProfile.selected_server_ids)
+    }
+  }, [mcpProfile])
+
+  const codexModels = models.filter(m => m.provider === CODEX_APP_SERVER_PROVIDER)
+  const registeredModel = status?.registered_model_id
+    ? codexModels.find(m => m.id === status.registered_model_id)
+    : codexModels.find(m => m.name === status?.model)
+  const registeredModelId = registeredModel?.id || status?.registered_model_id
+  const defaultSlots = status?.default_slots || {}
+  const allLanguageDefaults =
+    defaultSlots.default_chat_model &&
+    defaultSlots.default_transformation_model &&
+    defaultSlots.large_context_model &&
+    defaultSlots.default_tools_model
+
+  const fallbackDefaultModel = defaults?.default_chat_model
+    ? models.find(m => m.id === defaults.default_chat_model)
+    : undefined
+  const codexSupportedMcpServers = mcpProfile?.available_servers.filter(server => server.codex_native_supported) || []
+  const toggleMcpServer = (serverId: string) => {
+    setSelectedMcpServerIds(current =>
+      current.includes(serverId)
+        ? current.filter(id => id !== serverId)
+        : [...current, serverId]
+    )
+  }
+  const saveMcpProfile = () => {
+    updateMcpProfile.mutate({
+      mode: mcpMode,
+      selected_server_ids: mcpMode === 'selected' ? selectedMcpServerIds : [],
+      custom_profile_name: null,
+    })
+  }
+
+  return (
+    <>
+      <div className="space-y-3">
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Checking Codex runtime
+          </div>
+        ) : (
+          <>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-md border p-2">
+                <div className="text-xs text-muted-foreground">Runtime</div>
+                <div className="mt-1 flex items-center gap-1.5 text-sm font-medium">
+                  {status?.available ? (
+                    <Check className="h-3.5 w-3.5 text-emerald-500" />
+                  ) : (
+                    <X className="h-3.5 w-3.5 text-destructive" />
+                  )}
+                  {status?.available ? 'Available' : 'Unavailable'}
+                </div>
+              </div>
+              <div className="rounded-md border p-2">
+                <div className="text-xs text-muted-foreground">Model</div>
+                <div className="mt-1 truncate text-sm font-medium">{status?.model || 'Not configured'}</div>
+              </div>
+              <div className="rounded-md border p-2">
+                <div className="text-xs text-muted-foreground">Sandbox</div>
+                <div className="mt-1 truncate text-sm font-medium">{status?.sandbox || 'read-only'}</div>
+              </div>
+              <div className="rounded-md border p-2">
+                <div className="text-xs text-muted-foreground">Defaults</div>
+                <div className="mt-1 flex items-center gap-1.5 text-sm font-medium">
+                  {allLanguageDefaults ? (
+                    <Check className="h-3.5 w-3.5 text-emerald-500" />
+                  ) : (
+                    <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
+                  )}
+                  {allLanguageDefaults ? 'Language default' : 'Not all set'}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+              <div>
+                <span className="font-medium text-foreground">Binary:</span> {status?.codex_bin || 'codex'}
+                {status?.cli_found ? '' : ' (not found)'}
+              </div>
+              <div>
+                <span className="font-medium text-foreground">Codex home:</span>{' '}
+                {status?.codex_home_label || 'environment default'}
+              </div>
+              <div>
+                <span className="font-medium text-foreground">Profile:</span>{' '}
+                {status?.profile || 'default'}
+              </div>
+              <div>
+                <span className="font-medium text-foreground">Effort / timeout:</span>{' '}
+                {status?.effort || 'medium'} / {status?.timeout || 900}s
+              </div>
+              <div className="sm:col-span-2">
+                <span className="font-medium text-foreground">Working directory:</span>{' '}
+                {status?.cwd || '/tmp/open-notebook-codex-app-server-cwd'}
+              </div>
+            </div>
+
+            {status?.help_error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{status.help_error}</AlertDescription>
+              </Alert>
+            )}
+
+            {fallbackDefaultModel && fallbackDefaultModel.provider !== CODEX_APP_SERVER_PROVIDER && (
+              <p className="text-xs text-muted-foreground">
+                Current chat default: {fallbackDefaultModel.provider} / {fallbackDefaultModel.name}
+              </p>
+            )}
+          </>
+        )}
+
+        {codexModels.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {codexModels.map(model => {
+              const isDefault = model.id === registeredModelId && allLanguageDefaults
+              return (
+                <Badge key={model.id} variant={isDefault ? 'default' : 'secondary'} className="text-xs gap-1">
+                  {model.name}
+                  {isDefault && <span className="opacity-75">(default)</span>}
+                </Badge>
+              )
+            })}
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => syncCodex.mutate()}
+            disabled={syncCodex.isPending || status?.available === false}
+            className="gap-1.5"
+          >
+            {syncCodex.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+            Sync model
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setDefaults.mutate()}
+            disabled={setDefaults.isPending || status?.available === false}
+            className="gap-1.5"
+          >
+            {setDefaults.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
+            Set language defaults
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => registeredModelId && testModel(registeredModelId, registeredModel?.name || status?.model || 'Codex App Server')}
+            disabled={!registeredModelId || isModelTestPending || status?.available === false}
+            className="gap-1.5"
+          >
+            {isModelTestPending && testingModelId === registeredModelId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plug className="h-3.5 w-3.5" />}
+            Test model
+          </Button>
+        </div>
+
+        <div className="space-y-3 rounded-md border p-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-sm font-medium">Codex MCP profile</div>
+              <p className="text-xs text-muted-foreground">
+                Preview trusted local MCP servers for Codex-native configuration.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Select value={mcpMode} onValueChange={(value) => setMcpMode(value as CodexMCPProfileMode)}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No tools</SelectItem>
+                  <SelectItem value="read_only">Read-only local</SelectItem>
+                  <SelectItem value="selected">Selected servers</SelectItem>
+                  <SelectItem value="custom">Custom profile</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={saveMcpProfile}
+                disabled={updateMcpProfile.isPending || isMcpProfileLoading}
+              >
+                {updateMcpProfile.isPending && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
+                Save MCP profile
+              </Button>
+            </div>
+          </div>
+
+          {mcpMode === 'selected' && (
+            <div className="space-y-2">
+              {codexSupportedMcpServers.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No enabled stdio MCP servers are configured.</p>
+              ) : (
+                codexSupportedMcpServers.map(server => (
+                  <button
+                    key={server.id || server.name}
+                    type="button"
+                    onClick={() => server.id && toggleMcpServer(server.id)}
+                    className="flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm hover:bg-muted"
+                    disabled={!server.id}
+                  >
+                    <span>
+                      {server.name}
+                      {server.has_mutating_classification && (
+                        <span className="ml-2 text-xs text-amber-600">has mutating tools</span>
+                      )}
+                    </span>
+                    <Badge variant={server.id && selectedMcpServerIds.includes(server.id) ? 'default' : 'secondary'}>
+                      {server.id && selectedMcpServerIds.includes(server.id) ? 'Selected' : 'Off'}
+                    </Badge>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+
+          {mcpProfile?.warnings.map((warning) => (
+            <Alert key={warning}>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{warning}</AlertDescription>
+            </Alert>
+          ))}
+
+          {mcpProfile?.codex_config_toml ? (
+            <pre className="max-h-56 overflow-auto rounded-md bg-muted p-3 text-xs">
+              {mcpProfile.codex_config_toml}
+            </pre>
+          ) : (
+            <p className="text-xs text-muted-foreground">No Codex MCP config will be generated for this profile.</p>
+          )}
+        </div>
+      </div>
+
+      <ModelTestResultDialog
+        open={testResult !== null}
+        onOpenChange={(open) => { if (!open) clearResult() }}
+        result={testResult}
+        modelName={testedModelName}
+      />
+    </>
+  )
+}
+
 function ProviderSection({
   provider,
   credentials,
@@ -1016,12 +1288,13 @@ function ProviderSection({
 
   const displayName = PROVIDER_DISPLAY_NAMES[provider] || provider
   const modalities = PROVIDER_MODALITIES[provider] || ['language']
-  const hasCredentials = credentials.length > 0
+  const isCodexAppServer = provider === CODEX_APP_SERVER_PROVIDER
+  const hasCredentials = isCodexAppServer || credentials.length > 0
 
   // Models linked to any credential of this provider
-  const providerModels = models.filter(m =>
-    credentials.some(c => c.id === m.credential)
-  )
+  const providerModels = isCodexAppServer
+    ? models.filter(m => m.provider === CODEX_APP_SERVER_PROVIDER)
+    : models.filter(m => credentials.some(c => c.id === m.credential))
   const activeTypes = new Set(providerModels.map(m => m.type))
 
   return (
@@ -1059,29 +1332,35 @@ function ProviderSection({
         </div>
       </CardHeader>
       <CardContent className="space-y-2">
-        {credentials.map(cred => (
-          <CredentialItem
-            key={cred.id}
-            credential={cred}
-            models={models}
-            defaults={defaults}
-            allCredentials={allCredentials}
-          />
-        ))}
+        {isCodexAppServer ? (
+          <CodexAppServerPanel models={models} defaults={defaults} />
+        ) : (
+          <>
+            {credentials.map(cred => (
+              <CredentialItem
+                key={cred.id}
+                credential={cred}
+                models={models}
+                defaults={defaults}
+                allCredentials={allCredentials}
+              />
+            ))}
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setAddOpen(true)}
-          className="w-full gap-2"
-          disabled={!encryptionReady}
-        >
-          <Plus className="h-4 w-4" />
-          {t('apiKeys.addConfig')}
-        </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAddOpen(true)}
+              className="w-full gap-2"
+              disabled={!encryptionReady}
+            >
+              <Plus className="h-4 w-4" />
+              {t('apiKeys.addConfig')}
+            </Button>
+          </>
+        )}
       </CardContent>
 
-      {addOpen && (
+      {addOpen && !isCodexAppServer && (
         <CredentialFormDialog
           open={addOpen}
           onOpenChange={setAddOpen}

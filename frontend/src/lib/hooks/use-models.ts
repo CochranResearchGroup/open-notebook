@@ -4,13 +4,15 @@ import { modelsApi } from '@/lib/api/models'
 import { useToast } from '@/lib/hooks/use-toast'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { getApiErrorKey } from '@/lib/utils/error-handler'
-import { CreateModelRequest, ModelDefaults, ModelTestResult } from '@/lib/types/models'
+import { CodexMCPProfileUpdate, CreateModelRequest, ModelDefaults, ModelTestResult } from '@/lib/types/models'
 
 export const MODEL_QUERY_KEYS = {
   models: ['models'] as const,
   model: (id: string) => ['models', id] as const,
   defaults: ['models', 'defaults'] as const,
   providers: ['models', 'providers'] as const,
+  codexAppServer: ['models', 'codex-app-server'] as const,
+  codexMcpProfile: ['models', 'codex-app-server', 'mcp-profile'] as const,
 }
 
 export function useModels() {
@@ -113,6 +115,100 @@ export function useProviders() {
   return useQuery({
     queryKey: MODEL_QUERY_KEYS.providers,
     queryFn: () => modelsApi.getProviders(),
+  })
+}
+
+export function useCodexAppServerStatus() {
+  return useQuery({
+    queryKey: MODEL_QUERY_KEYS.codexAppServer,
+    queryFn: () => modelsApi.getCodexAppServerStatus(),
+  })
+}
+
+export function useSyncCodexAppServer() {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  const { t } = useTranslation()
+
+  return useMutation({
+    mutationFn: () => modelsApi.syncCodexAppServer(),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: MODEL_QUERY_KEYS.models })
+      queryClient.invalidateQueries({ queryKey: MODEL_QUERY_KEYS.providers })
+      queryClient.invalidateQueries({ queryKey: MODEL_QUERY_KEYS.codexAppServer })
+      toast({
+        title: t('common.success'),
+        description: result.new > 0
+          ? t('models.syncSuccess')
+            .replace('{discovered}', result.discovered.toString())
+            .replace('{new}', result.new.toString())
+          : t('models.syncNoNew').replace('{count}', result.discovered.toString()),
+      })
+    },
+    onError: (error: unknown) => {
+      toast({
+        title: t('common.error'),
+        description: getApiErrorKey(error, t('models.syncFailed')),
+        variant: 'destructive',
+      })
+    },
+  })
+}
+
+export function useSetCodexAppServerDefaults() {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  const { t } = useTranslation()
+
+  return useMutation({
+    mutationFn: () => modelsApi.setCodexAppServerDefaults(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: MODEL_QUERY_KEYS.models })
+      queryClient.invalidateQueries({ queryKey: MODEL_QUERY_KEYS.defaults })
+      queryClient.invalidateQueries({ queryKey: MODEL_QUERY_KEYS.codexAppServer })
+      toast({
+        title: t('common.success'),
+        description: t('models.saveSuccess'),
+      })
+    },
+    onError: (error: unknown) => {
+      toast({
+        title: t('common.error'),
+        description: getApiErrorKey(error, t('common.error')),
+        variant: 'destructive',
+      })
+    },
+  })
+}
+
+export function useCodexMCPProfile() {
+  return useQuery({
+    queryKey: MODEL_QUERY_KEYS.codexMcpProfile,
+    queryFn: () => modelsApi.getCodexMCPProfile(),
+  })
+}
+
+export function useUpdateCodexMCPProfile() {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  const { t } = useTranslation()
+
+  return useMutation({
+    mutationFn: (data: CodexMCPProfileUpdate) => modelsApi.updateCodexMCPProfile(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: MODEL_QUERY_KEYS.codexMcpProfile })
+      toast({
+        title: t('common.success'),
+        description: t('models.codexMcpProfileSaveSuccess'),
+      })
+    },
+    onError: (error: unknown) => {
+      toast({
+        title: t('common.error'),
+        description: getApiErrorKey(error, t('common.error')),
+        variant: 'destructive',
+      })
+    },
   })
 }
 

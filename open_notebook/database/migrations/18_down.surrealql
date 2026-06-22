@@ -1,0 +1,3 @@
+-- Migration 18 rollback: remove Codex MCP profile preferences.
+
+DELETE open_notebook:codex_mcp_profile;

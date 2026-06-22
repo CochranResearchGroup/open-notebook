@@ -8,11 +8,22 @@ from loguru import logger
 from pydantic import BaseModel
 
 from api.models import (
+    CodexAppServerDefaultsResponse,
+    CodexAppServerStatusResponse,
+    CodexMCPProfileResponse,
+    CodexMCPProfileUpdate,
     DefaultModelsResponse,
     ModelCreate,
     ModelResponse,
     ProviderAvailabilityResponse,
 )
+from open_notebook.ai.codex_app_server import (
+    CODEX_APP_SERVER_PROVIDER,
+    codex_app_server_available,
+    codex_app_server_model_name,
+    codex_app_server_status,
+)
+from open_notebook.ai.codex_mcp import build_codex_mcp_profile_response
 from open_notebook.ai.connection_tester import test_individual_model
 from open_notebook.ai.key_provider import provision_provider_keys
 from open_notebook.ai.model_discovery import (
@@ -22,6 +33,7 @@ from open_notebook.ai.model_discovery import (
     sync_provider_models,
 )
 from open_notebook.ai.models import DefaultModels, Model
+from open_notebook.domain.codex_mcp_profile import CodexMCPProfile
 from open_notebook.domain.credential import Credential
 from open_notebook.exceptions import InvalidInputError, NotFoundError
 
@@ -83,8 +95,50 @@ class ModelTestResponse(BaseModel):
     details: Optional[str] = None
 
 
+async def _get_codex_registered_model() -> Optional[Model]:
+    from open_notebook.database.repository import repo_query
+
+    models = await repo_query(
+        "SELECT * FROM model WHERE provider = $provider AND name = $name AND type = $type LIMIT 1",
+        {
+            "provider": CODEX_APP_SERVER_PROVIDER,
+            "name": codex_app_server_model_name(),
+            "type": "language",
+        },
+    )
+    if not models:
+        return None
+    return Model(**models[0])
+
+
+async def _ensure_codex_registered_model() -> Model:
+    model = await _get_codex_registered_model()
+    if model:
+        return model
+
+    await sync_provider_models(CODEX_APP_SERVER_PROVIDER, auto_register=True)
+    model = await _get_codex_registered_model()
+    if model:
+        return model
+
+    raise RuntimeError("Codex app-server model could not be registered")
+
+
+async def _codex_default_slots(model_id: str | None) -> dict[str, bool]:
+    defaults = await DefaultModels.get_instance()
+    return {
+        "default_chat_model": bool(model_id and defaults.default_chat_model == model_id),
+        "default_transformation_model": bool(
+            model_id and defaults.default_transformation_model == model_id
+        ),
+        "large_context_model": bool(model_id and defaults.large_context_model == model_id),
+        "default_tools_model": bool(model_id and defaults.default_tools_model == model_id),
+    }
+
+
 # Provider priority for auto-assignment (higher priority first)
 PROVIDER_PRIORITY = [
+    CODEX_APP_SERVER_PROVIDER,
     "openai",
     "anthropic",
     "google",
@@ -102,6 +156,7 @@ PROVIDER_PRIORITY = [
 
 # Model preference patterns (preferred models within each provider)
 MODEL_PREFERENCES = {
+    CODEX_APP_SERVER_PROVIDER: ["gpt-5.5", "gpt-5.4", "gpt-5"],
     "openai": ["gpt-4o", "gpt-4", "gpt-3.5-turbo"],
     "anthropic": ["claude-3-5-sonnet", "claude-3-opus", "claude-3-sonnet"],
     "google": ["gemini-2.0", "gemini-1.5-pro", "gemini-pro"],
@@ -110,6 +165,123 @@ MODEL_PREFERENCES = {
     "dashscope": ["qwen-max", "qwen-plus", "qwen-turbo"],
     "minimax": ["MiniMax-M2.5", "MiniMax-M2.5-highspeed"],
 }
+
+
+@router.get(
+    "/models/codex-app-server/status",
+    response_model=CodexAppServerStatusResponse,
+)
+async def get_codex_app_server_status():
+    """Return safe runtime status for the Codex app-server provider."""
+    try:
+        status = codex_app_server_status()
+        registered_model = await _get_codex_registered_model()
+        model_id = registered_model.id if registered_model else None
+        status["registered_model_id"] = model_id
+        status["default_slots"] = await _codex_default_slots(model_id)
+        return CodexAppServerStatusResponse(**status)
+    except Exception as e:
+        logger.error(f"Error checking Codex app-server status: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error checking Codex app-server status: {str(e)}",
+        )
+
+
+@router.post("/models/codex-app-server/sync", response_model=ProviderSyncResponse)
+async def sync_codex_app_server_model():
+    """Register the configured Codex app-server language model."""
+    try:
+        discovered, new, existing = await sync_provider_models(
+            CODEX_APP_SERVER_PROVIDER, auto_register=True
+        )
+        return ProviderSyncResponse(
+            provider=CODEX_APP_SERVER_PROVIDER,
+            discovered=discovered,
+            new=new,
+            existing=existing,
+        )
+    except Exception as e:
+        logger.error(f"Error syncing Codex app-server model: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error syncing Codex app-server model: {str(e)}",
+        )
+
+
+@router.post(
+    "/models/codex-app-server/set-language-defaults",
+    response_model=CodexAppServerDefaultsResponse,
+)
+async def set_codex_app_server_language_defaults():
+    """Set Codex app-server as the default language model for language slots."""
+    try:
+        model = await _ensure_codex_registered_model()
+        if not model.id:
+            raise RuntimeError("Codex app-server model did not have an id after save")
+
+        defaults = await DefaultModels.get_instance()
+        defaults.default_chat_model = model.id  # type: ignore[attr-defined]
+        defaults.default_transformation_model = model.id  # type: ignore[attr-defined]
+        defaults.large_context_model = model.id  # type: ignore[attr-defined]
+        defaults.default_tools_model = model.id  # type: ignore[attr-defined]
+        await defaults.update()
+
+        return CodexAppServerDefaultsResponse(
+            model_id=model.id,
+            default_chat_model=model.id,
+            default_transformation_model=model.id,
+            large_context_model=model.id,
+            default_tools_model=model.id,
+        )
+    except Exception as e:
+        logger.error(f"Error setting Codex app-server defaults: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error setting Codex app-server defaults: {str(e)}",
+        )
+
+
+@router.get(
+    "/models/codex-app-server/mcp-profile",
+    response_model=CodexMCPProfileResponse,
+)
+async def get_codex_app_server_mcp_profile():
+    """Return the Codex App Server MCP profile and safe config preview."""
+    try:
+        profile = await CodexMCPProfile.get_instance()
+        return CodexMCPProfileResponse(
+            **await build_codex_mcp_profile_response(profile)  # type: ignore[arg-type]
+        )
+    except Exception as e:
+        logger.error(f"Error reading Codex MCP profile: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error reading Codex MCP profile: {str(e)}",
+        )
+
+
+@router.put(
+    "/models/codex-app-server/mcp-profile",
+    response_model=CodexMCPProfileResponse,
+)
+async def update_codex_app_server_mcp_profile(update: CodexMCPProfileUpdate):
+    """Update the Codex App Server MCP profile preferences."""
+    try:
+        profile = await CodexMCPProfile.get_instance()
+        profile.mode = update.mode  # type: ignore[attr-defined]
+        profile.selected_server_ids = update.selected_server_ids  # type: ignore[attr-defined]
+        profile.custom_profile_name = update.custom_profile_name  # type: ignore[attr-defined]
+        await profile.update()
+        return CodexMCPProfileResponse(
+            **await build_codex_mcp_profile_response(profile)  # type: ignore[arg-type]
+        )
+    except Exception as e:
+        logger.error(f"Error updating Codex MCP profile: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error updating Codex MCP profile: {str(e)}",
+        )
 
 
 async def _check_provider_has_credential(provider: str) -> bool:
@@ -423,6 +595,8 @@ async def get_provider_availability():
             or _check_openai_compatible_support("TTS")
         )
 
+        provider_status[CODEX_APP_SERVER_PROVIDER] = codex_app_server_available()
+
         available_providers = [k for k, v in provider_status.items() if v]
         unavailable_providers = [k for k, v in provider_status.items() if not v]
 
@@ -443,7 +617,9 @@ async def get_provider_availability():
             }
 
             # Special handling for openai-compatible to check mode-specific availability
-            if provider == "openai_compatible":
+            if provider == CODEX_APP_SERVER_PROVIDER:
+                supported_types[provider].append("language")
+            elif provider == "openai_compatible":
                 # Esperanto exposes this provider with a hyphen ("openai-compatible"),
                 # while the rest of the codebase uses the underscore form.
                 esperanto_name = "openai-compatible"

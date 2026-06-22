@@ -2,6 +2,7 @@ from esperanto import LanguageModel
 from langchain_core.language_models.chat_models import BaseChatModel
 from loguru import logger
 
+from open_notebook.ai.codex_app_server import CodexAppServerLanguageModel
 from open_notebook.ai.models import model_manager
 from open_notebook.exceptions import ConfigurationError
 from open_notebook.utils import token_count
@@ -46,6 +47,9 @@ async def provision_langchain_model(
             f"No model configured for {selection_reason}. "
             f"Please go to Settings → Models and configure a default model for '{default_type}'."
         )
+
+    if isinstance(model, CodexAppServerLanguageModel):
+        return model.to_langchain()
 
     if not isinstance(model, LanguageModel):
         logger.error(

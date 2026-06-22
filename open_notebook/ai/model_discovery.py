@@ -13,6 +13,11 @@ from typing import Dict, List, Optional, Tuple
 import httpx
 from loguru import logger
 
+from open_notebook.ai.codex_app_server import (
+    CODEX_APP_SERVER_PROVIDER,
+    codex_app_server_available,
+    codex_app_server_model_name,
+)
 from open_notebook.ai.models import Model
 from open_notebook.database.repository import repo_query
 from open_notebook.domain.credential import Credential
@@ -711,6 +716,20 @@ async def discover_openai_compatible_models() -> List[DiscoveredModel]:
     return models
 
 
+async def discover_codex_app_server_models() -> List[DiscoveredModel]:
+    """Expose the configured Codex app-server model as a language model."""
+    if not codex_app_server_available():
+        return []
+    return [
+        DiscoveredModel(
+            name=codex_app_server_model_name(),
+            provider=CODEX_APP_SERVER_PROVIDER,
+            model_type="language",
+            description="Codex app-server model configured for Open Notebook",
+        )
+    ]
+
+
 # =============================================================================
 # Main Discovery Functions
 # =============================================================================
@@ -730,6 +749,7 @@ PROVIDER_DISCOVERY_FUNCTIONS = {
     "elevenlabs": discover_elevenlabs_models,
     "deepgram": discover_deepgram_models,
     "openai_compatible": discover_openai_compatible_models,
+    CODEX_APP_SERVER_PROVIDER: discover_codex_app_server_models,
     "dashscope": discover_dashscope_models,
     "minimax": discover_minimax_models,
     "azure": None,  # Azure requires credential-based discovery (different auth)

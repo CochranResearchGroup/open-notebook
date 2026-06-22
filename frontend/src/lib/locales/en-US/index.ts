@@ -842,6 +842,7 @@ export const enUS = {
     apiKey: "API Key",
     deleteSuccess: "Model deleted successfully",
     saveSuccess: "Model saved successfully",
+    codexMcpProfileSaveSuccess: "Codex MCP profile saved successfully",
     noModels: "No models",
     discoverModels: "Discover Models",
     noModelsFound: "No models found from this provider",

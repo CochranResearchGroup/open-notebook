@@ -18,6 +18,10 @@ from loguru import logger
 from pydantic import SecretStr
 
 from api.models import CredentialResponse
+from open_notebook.ai.codex_app_server import (
+    CODEX_APP_SERVER_PROVIDER,
+    codex_app_server_available,
+)
 from open_notebook.ai.model_discovery import classify_model_type
 from open_notebook.domain.credential import Credential
 from open_notebook.utils.encryption import get_secret_from_env
@@ -59,6 +63,7 @@ PROVIDER_ENV_CONFIG: Dict[str, dict] = {
     "openai_compatible": {
         "required_any": ["OPENAI_COMPATIBLE_BASE_URL", "OPENAI_COMPATIBLE_API_KEY"],
     },
+    CODEX_APP_SERVER_PROVIDER: {"custom": "codex_app_server"},
     "dashscope": {"required": ["DASHSCOPE_API_KEY"]},
     "minimax": {"required": ["MINIMAX_API_KEY"]},
 }
@@ -79,6 +84,7 @@ PROVIDER_MODALITIES: Dict[str, List[str]] = {
     "vertex": ["language", "embedding", "text_to_speech"],
     "azure": ["language", "embedding", "speech_to_text", "text_to_speech"],
     "openai_compatible": ["language", "embedding", "speech_to_text", "text_to_speech"],
+    CODEX_APP_SERVER_PROVIDER: ["language"],
     "dashscope": ["language"],
     "minimax": ["language"],
 }
@@ -241,6 +247,8 @@ def check_env_configured(provider: str) -> bool:
         return any(bool(os.environ.get(v, "").strip()) for v in config["required_any"])
     elif "required" in config:
         return all(bool(os.environ.get(v, "").strip()) for v in config["required"])
+    elif config.get("custom") == "codex_app_server":
+        return codex_app_server_available()
     return False
 
 
