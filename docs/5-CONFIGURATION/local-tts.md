@@ -105,6 +105,140 @@ export OPENAI_COMPATIBLE_BASE_URL_TTS=http://localhost:8969/v1
 
 ---
 
+## Built-in Kokoro Runtime Wrapper
+
+Open Notebook also ships a small optional Kokoro runtime wrapper under
+[`scripts/local_tts/kokoro_openai_server.py`](../../scripts/local_tts/kokoro_openai_server.py).
+It is useful when you want a tiny local ONNX-backed TTS service with both an
+OpenAI-compatible API and a browser UI for inspection.
+
+The wrapper exposes:
+
+- `GET /` browser UI for text entry, voice selection, speed, playback, and WAV download
+- `GET /docs` FastAPI API inspector
+- `GET /v1/models`
+- `GET /v1/audio/voices`
+- `POST /v1/audio/speech`
+
+Run it with `uvicorn` after installing `kokoro-onnx` and placing the ONNX model
+and voices file under a user-scoped runtime directory. See
+[`scripts/local_tts/README.md`](../../scripts/local_tts/README.md) for install,
+environment, and service details.
+
+Example OpenAI-compatible base URLs:
+
+```text
+http://host.docker.internal:18880/v1  # Open Notebook in Docker
+http://127.0.0.1:18880/v1            # Open Notebook on the same host
+```
+
+## Optional Chatterbox and Orpheus Wrappers
+
+The same `scripts/local_tts/` directory also includes optional local wrappers
+for heavier expressive TTS backends:
+
+- [`chatterbox_openai_server.py`](../../scripts/local_tts/chatterbox_openai_server.py)
+  for Resemble AI Chatterbox. It includes a browser UI, OpenAI-compatible
+  speech endpoint, and optional voice prompt upload.
+- [`orpheus_openai_server.py`](../../scripts/local_tts/orpheus_openai_server.py)
+  for Orpheus. It includes a browser UI, OpenAI-compatible speech endpoint, and
+  voice selection for the Orpheus voices exposed by the package.
+
+Suggested local ports:
+
+```text
+Kokoro:     http://host.docker.internal:18880/v1
+Chatterbox: http://host.docker.internal:18882/v1
+Orpheus:    http://host.docker.internal:18883/v1
+Dia API:    http://host.docker.internal:18884/v1
+```
+
+### Register Local TTS Models In Open Notebook
+
+Starting a local TTS service is only the first step. Open Notebook also needs
+`openai_compatible` credential and model records before the service appears in
+Settings -> API Keys / Models or in Default Model Assignments.
+
+Use the repo-owned registration helper from an Open Notebook runtime
+environment:
+
+```bash
+uv run python scripts/register_local_tts_models.py
+```
+
+For the Cooper Docker deployment, run the helper inside the live app container:
+
+```bash
+docker exec -i open-notebook-cooper /app/.venv/bin/python /app/scripts/register_local_tts_models.py
+```
+
+By default the helper registers:
+
+| Service | Model | Base URL |
+| --- | --- | --- |
+| Kokoro | `kokoro-82m` | `http://host.docker.internal:18880/v1` |
+| Chatterbox | `chatterbox-tts` | `http://host.docker.internal:18882/v1` |
+| Orpheus | `orpheus-3b` | `http://host.docker.internal:18883/v1` |
+
+It also sets `kokoro-82m` as `default_text_to_speech_model`. Override service
+URLs or the default model with environment variables:
+
+```bash
+OPEN_NOTEBOOK_LOCAL_TTS_KOKORO_URL=http://127.0.0.1:18880/v1 \
+OPEN_NOTEBOOK_LOCAL_TTS_CHATTERBOX_URL=http://127.0.0.1:18882/v1 \
+OPEN_NOTEBOOK_LOCAL_TTS_ORPHEUS_URL=http://127.0.0.1:18883/v1 \
+OPEN_NOTEBOOK_LOCAL_TTS_DEFAULT=orpheus-3b \
+uv run python scripts/register_local_tts_models.py
+```
+
+Dia is opt-in because it needs the separate OpenAI-compatible wrapper on port
+`18884`, while the Gradio UI remains on port `18881`:
+
+```bash
+OPEN_NOTEBOOK_LOCAL_TTS_DIA_URL=http://host.docker.internal:18884/v1 \
+uv run python scripts/register_local_tts_models.py --include-dia
+```
+
+Dia can condition generation on an uploaded voice sample. Upstream Dia expects
+the transcript of that sample before the text to generate. The local wrapper
+keeps manual transcript entry available, but it can also call Open Notebook's
+configured default speech-to-text model to fill the transcript automatically.
+
+Configure the wrapper service with:
+
+```bash
+DIA_TRANSCRIPTION_URL=http://127.0.0.1:5055/api/audio/transcriptions
+DIA_TRANSCRIPTION_AUTH_BEARER=<open-notebook-password>
+```
+
+The Open Notebook endpoint is:
+
+```text
+POST /api/audio/transcriptions
+```
+
+It accepts multipart form data with `file`, optional `language`, and optional
+`prompt`, then returns the transcription from `default_speech_to_text_model`.
+The Dia wrapper exposes the same convenience at `/v1/audio/transcriptions` and
+uses it automatically from `/v1/audio/speech-form` when a voice sample is
+uploaded without a transcript.
+
+On the Cooper WSL deployment these are exposed for inspection as:
+
+```text
+Kokoro:     https://kokoro.ecochran.dyndns.org/
+Dia:        https://dia.ecochran.dyndns.org/
+Chatterbox: https://chatterbox.ecochran.dyndns.org/
+Orpheus:    https://orpheus.ecochran.dyndns.org/
+```
+
+These wrappers are intended for local operators. Keep model weights, Hugging
+Face cache, generated audio, and service files outside the repo. See
+[`scripts/local_tts/README.md`](../../scripts/local_tts/README.md) for runtime
+commands and environment variables.
+
+---
+
 ## Available Voices
 
 The Kokoro model includes multiple voices:
