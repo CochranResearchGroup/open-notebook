@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { AlertCircle, CheckCircle2, Loader2, Plug, Trash2 } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Download, Loader2, Plug, Trash2 } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,8 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   useCreateMCPServer,
   useDeleteMCPServer,
+  useDiscoverLocalMCPServers,
+  useImportLocalMCPServer,
   useMCPServers,
   useTestMCPServer,
   useUpdateMCPServer,
@@ -194,6 +196,93 @@ function MCPServerRow({ server }: { server: MCPServer }) {
   )
 }
 
+function LocalMCPDiscovery() {
+  const { data, isLoading, isError, refetch, isFetching } = useDiscoverLocalMCPServers()
+  const importServer = useImportLocalMCPServer()
+  const candidates = data?.candidates || []
+
+  return (
+    <div className="space-y-3 rounded-md border p-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h3 className="font-medium">Discovered local MCP servers</h3>
+          <p className="text-sm text-muted-foreground">
+            Import MCP servers found in local agent runtime config. Secret-looking environment values are redacted.
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+          {isFetching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plug className="mr-2 h-4 w-4" />}
+          Refresh
+        </Button>
+      </div>
+
+      {isError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>Could not discover local MCP servers.</AlertDescription>
+        </Alert>
+      )}
+
+      {data?.warnings?.map((warning) => (
+        <Alert key={warning} variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{warning}</AlertDescription>
+        </Alert>
+      ))}
+
+      {isLoading ? (
+        <div className="text-sm text-muted-foreground">Checking local agent config...</div>
+      ) : candidates.length === 0 ? (
+        <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+          No local MCP servers discovered.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {candidates.map((candidate) => (
+            <div key={candidate.candidate_id} className="rounded-md border p-3">
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div className="min-w-0 space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{candidate.name}</span>
+                    <Badge variant="outline">{candidate.source}</Badge>
+                    <Badge variant={candidate.already_imported ? 'secondary' : 'outline'}>
+                      {candidate.already_imported ? 'imported' : 'available'}
+                    </Badge>
+                  </div>
+                  <p className="break-all text-sm text-muted-foreground">
+                    {candidate.transport === 'stdio'
+                      ? [candidate.command, ...candidate.args].filter(Boolean).join(' ')
+                      : candidate.url}
+                  </p>
+                  {candidate.env_keys.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Env keys: {candidate.env_keys.join(', ')}
+                    </p>
+                  )}
+                  {candidate.source_path && (
+                    <p className="break-all text-xs text-muted-foreground">
+                      Source: {candidate.source_path}
+                    </p>
+                  )}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => importServer.mutate(candidate.candidate_id)}
+                  disabled={candidate.already_imported || importServer.isPending}
+                >
+                  {importServer.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                  Import
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function MCPServers() {
   const { data: servers = [], isLoading, isError } = useMCPServers()
   const createServer = useCreateMCPServer()
@@ -234,6 +323,8 @@ export function MCPServers() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        <LocalMCPDiscovery />
+
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="mcp-name">Name</Label>

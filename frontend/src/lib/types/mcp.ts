@@ -20,6 +20,21 @@ export interface MCPServer {
   metadata: Record<string, unknown>
 }
 
+export interface MCPLocalServerCandidate extends MCPServer {
+  source: string
+  source_path?: string | null
+  candidate_id: string
+  signature: string
+  already_imported: boolean
+  imported_server_id?: string | null
+}
+
+export interface MCPLocalDiscovery {
+  candidates: MCPLocalServerCandidate[]
+  searched_paths: string[]
+  warnings: string[]
+}
+
 export interface MCPServerInput {
   name: string
   transport: MCPTransport

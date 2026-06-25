@@ -1,7 +1,13 @@
 from fastapi import APIRouter, HTTPException, Query
 from loguru import logger
 
+from api.mcp_discovery_service import (
+    discover_local_mcp_servers,
+    import_local_mcp_server,
+)
 from api.models import (
+    MCPLocalDiscoveryResponse,
+    MCPLocalImportRequest,
     MCPServerCreate,
     MCPServerResponse,
     MCPServerTestResponse,
@@ -58,6 +64,23 @@ def _to_audit_response(audit: MCPToolAudit) -> MCPToolAuditResponse:
 async def list_servers():
     servers = await MCPServerConfig.get_all(order_by="name asc")
     return [_to_response(server) for server in servers]
+
+
+@router.get("/mcp/discover-local", response_model=MCPLocalDiscoveryResponse)
+async def discover_local_servers():
+    return MCPLocalDiscoveryResponse(**await discover_local_mcp_servers())
+
+
+@router.post("/mcp/import-local", response_model=MCPServerResponse)
+async def import_local_server(payload: MCPLocalImportRequest):
+    try:
+        server = await import_local_mcp_server(
+            payload.candidate_id,
+            enabled=payload.enabled,
+        )
+        return _to_response(server)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.post("/mcp/servers", response_model=MCPServerResponse)

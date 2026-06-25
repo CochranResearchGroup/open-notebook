@@ -189,6 +189,67 @@ class APIClient:
         """Update default model assignments."""
         return self._make_request("PUT", "/api/models/defaults", json=defaults)
 
+    # MCP configuration API methods
+    def get_mcp_servers(self) -> List[Dict[Any, Any]]:
+        """Get configured MCP servers."""
+        result = self._make_request("GET", "/api/mcp/servers")
+        return result if isinstance(result, list) else [result]
+
+    def discover_local_mcp_servers(self) -> Union[Dict[Any, Any], List[Dict[Any, Any]]]:
+        """Discover local MCP server candidates from agent runtime config."""
+        return self._make_request("GET", "/api/mcp/discover-local")
+
+    def import_local_mcp_server(
+        self, candidate_id: str, enabled: bool = True
+    ) -> Union[Dict[Any, Any], List[Dict[Any, Any]]]:
+        """Import a discovered local MCP server candidate."""
+        return self._make_request(
+            "POST",
+            "/api/mcp/import-local",
+            json={"candidate_id": candidate_id, "enabled": enabled},
+        )
+
+    def create_mcp_server(self, **server) -> Union[Dict[Any, Any], List[Dict[Any, Any]]]:
+        """Create an MCP server config."""
+        return self._make_request("POST", "/api/mcp/servers", json=server)
+
+    def update_mcp_server(
+        self, server_id: str, **updates
+    ) -> Union[Dict[Any, Any], List[Dict[Any, Any]]]:
+        """Update an MCP server config."""
+        return self._make_request("PUT", f"/api/mcp/servers/{server_id}", json=updates)
+
+    def test_mcp_server(self, server_id: str) -> Union[Dict[Any, Any], List[Dict[Any, Any]]]:
+        """Test an MCP server config."""
+        return self._make_request("POST", f"/api/mcp/servers/{server_id}/test")
+
+    def delete_mcp_server(
+        self, server_id: str
+    ) -> Union[Dict[Any, Any], List[Dict[Any, Any]]]:
+        """Delete an MCP server config."""
+        return self._make_request("DELETE", f"/api/mcp/servers/{server_id}")
+
+    def get_codex_mcp_profile(self) -> Union[Dict[Any, Any], List[Dict[Any, Any]]]:
+        """Get Codex App Server MCP profile preferences."""
+        return self._make_request("GET", "/api/models/codex-app-server/mcp-profile")
+
+    def update_codex_mcp_profile(
+        self,
+        mode: str,
+        selected_server_ids: list[str] | None = None,
+        custom_profile_name: str | None = None,
+    ) -> Union[Dict[Any, Any], List[Dict[Any, Any]]]:
+        """Update Codex App Server MCP profile preferences."""
+        return self._make_request(
+            "PUT",
+            "/api/models/codex-app-server/mcp-profile",
+            json={
+                "mode": mode,
+                "selected_server_ids": selected_server_ids or [],
+                "custom_profile_name": custom_profile_name,
+            },
+        )
+
     # Transformations API methods
     def get_transformations(self) -> List[Dict[Any, Any]]:
         """Get all transformations."""

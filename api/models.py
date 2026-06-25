@@ -219,6 +219,36 @@ class MCPServerResponse(MCPServerBase):
     )
 
 
+class MCPLocalServerCandidate(MCPServerBase):
+    source: str = Field(..., description="Local runtime that exposed this candidate")
+    source_path: Optional[str] = Field(
+        None, description="Path to the local config source, when available"
+    )
+    candidate_id: str = Field(..., description="Stable import identifier")
+    signature: str = Field(..., description="Stable non-secret server signature")
+    already_imported: bool = Field(False)
+    imported_server_id: Optional[str] = None
+    env_keys: List[str] = Field(
+        default_factory=list,
+        description="Environment variable names referenced by the candidate",
+    )
+
+
+class MCPLocalDiscoveryResponse(BaseModel):
+    candidates: List[MCPLocalServerCandidate] = Field(default_factory=list)
+    searched_paths: List[str] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+
+
+class MCPLocalImportRequest(BaseModel):
+    candidate_id: str = Field(..., description="Candidate id returned by discovery")
+    enabled: bool = Field(True)
+    include_env_values: bool = Field(
+        False,
+        description="Reserved for future secret-aware imports. Current imports keep env values redacted.",
+    )
+
+
 class MCPToolResponse(BaseModel):
     name: str
     description: Optional[str] = None

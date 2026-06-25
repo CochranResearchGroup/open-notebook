@@ -2,6 +2,7 @@ import apiClient from './client'
 import type {
   MCPServer,
   MCPServerInput,
+  MCPLocalDiscovery,
   MCPServerTestResult,
   MCPToolCallInput,
   MCPToolCallResult,
@@ -10,6 +11,19 @@ import type {
 export const mcpApi = {
   listServers: async () => {
     const response = await apiClient.get<MCPServer[]>('/mcp/servers')
+    return response.data
+  },
+
+  discoverLocalServers: async () => {
+    const response = await apiClient.get<MCPLocalDiscovery>('/mcp/discover-local')
+    return response.data
+  },
+
+  importLocalServer: async (candidateId: string, enabled = true) => {
+    const response = await apiClient.post<MCPServer>('/mcp/import-local', {
+      candidate_id: candidateId,
+      enabled,
+    })
     return response.data
   },
 

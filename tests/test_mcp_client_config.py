@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -5,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api.main import app
+from api.mcp_discovery_service import _runtime_url_and_metadata
 from open_notebook.domain.mcp_server_config import MCPServerConfig
 from open_notebook.domain.mcp_tool_audit import MCPToolAudit, summarize_mcp_arguments
 from open_notebook.mcp_chat import (
@@ -13,6 +15,7 @@ from open_notebook.mcp_chat import (
 )
 from open_notebook.mcp_client import (
     call_mcp_tool,
+    list_mcp_tools,
     normalize_mcp_tool,
     normalize_mcp_tool_result,
     redacted_mcp_config,
@@ -23,6 +26,35 @@ class FakeTool:
     name = "list_files"
     description = "List files"
     inputSchema = {"type": "object"}
+
+
+class FakeMCPResult:
+    def __init__(self):
+        self.tools = [FakeTool()]
+
+
+class FakeClientSession:
+    def __init__(self, read_stream, write_stream):
+        self.read_stream = read_stream
+        self.write_stream = write_stream
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return None
+
+    async def initialize(self):
+        return None
+
+    async def list_tools(self):
+        return FakeMCPResult()
+
+    async def call_tool(self, tool_name, arguments):
+        return SimpleNamespace(
+            isError=False,
+            content=[SimpleNamespace(type="text", text=f"{tool_name}:{arguments['path']}")],
+        )
 
 
 def test_redacted_mcp_config_exposes_env_keys_without_values():
@@ -112,6 +144,63 @@ async def test_call_mcp_tool_rejects_mutating_tool_in_read_only_workflow():
 
 
 @pytest.mark.asyncio
+async def test_list_mcp_tools_supports_streamable_http_transport():
+    config = MCPServerConfig(
+        name="Graphiti",
+        transport="http",
+        url="http://127.0.0.1:8817/mcp",
+        timeout=3,
+    )
+
+    @asynccontextmanager
+    async def fake_http_client(url, headers=None, timeout=30, **kwargs):
+        assert url == "http://127.0.0.1:8817/mcp"
+        assert headers is None
+        assert timeout == 3
+        yield "read", "write", lambda: None
+
+    with (
+        patch("open_notebook.mcp_client.streamablehttp_client", fake_http_client),
+        patch("open_notebook.mcp_client.ClientSession", FakeClientSession),
+    ):
+        tools = await list_mcp_tools(config)
+
+    assert tools[0]["name"] == "list_files"
+
+
+@pytest.mark.asyncio
+async def test_call_mcp_tool_supports_sse_transport(monkeypatch):
+    config = MCPServerConfig(
+        name="Remote MCP",
+        transport="sse",
+        url="http://127.0.0.1:8817/sse",
+        auth_env_var="MCP_TOKEN",
+        metadata={"host_header": "127.0.0.1:8817"},
+        timeout=4,
+    )
+    monkeypatch.setenv("MCP_TOKEN", "secret-token")
+
+    @asynccontextmanager
+    async def fake_sse_client(url, headers=None, timeout=5, **kwargs):
+        assert url == "http://127.0.0.1:8817/sse"
+        assert headers == {
+            "Authorization": "Bearer secret-token",
+            "Host": "127.0.0.1:8817",
+        }
+        assert timeout == 4
+        yield "read", "write"
+
+    with (
+        patch("open_notebook.mcp_client.sse_client", fake_sse_client),
+        patch("open_notebook.mcp_client.ClientSession", FakeClientSession),
+    ):
+        result = await call_mcp_tool(config, "read_file", {"path": "."})
+
+    assert result["text"] == "read_file:."
+    assert result["permission"] == "read"
+
+
+@pytest.mark.asyncio
 async def test_build_mcp_augmented_chat_message_calls_read_only_tool():
     config = MCPServerConfig(
         id="mcp_server_config:local",
@@ -169,6 +258,76 @@ def test_create_mcp_server_endpoint_redacts_env_values():
     assert data["env"] == {}
     assert data["env_keys"] == ["TOKEN"]
     assert "secret" not in str(data)
+
+
+def test_discover_local_mcp_servers_endpoint_redacts_codex_env(tmp_path, monkeypatch):
+    client = TestClient(app)
+    codex_home = tmp_path / "codex-home"
+    codex_home.mkdir()
+    (codex_home / "config.toml").write_text(
+        """
+[mcp_servers.codegraph]
+command = "codegraph-mcp"
+args = ["--project", "/workspace/open-notebook"]
+
+[mcp_servers.codegraph.env]
+GRAPHITI_API_KEY = "secret"
+MODE = "readonly"
+""".strip()
+    )
+    monkeypatch.setenv("OPEN_NOTEBOOK_CODEX_HOME", str(codex_home))
+
+    with patch.object(
+        MCPServerConfig,
+        "get_all",
+        new_callable=AsyncMock,
+        return_value=[],
+    ):
+        response = client.get("/api/mcp/discover-local")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["candidates"][0]["source"] == "codex"
+    assert data["candidates"][0]["command"] == "codegraph-mcp"
+    assert data["candidates"][0]["env"]["GRAPHITI_API_KEY"] == "<redacted>"
+    assert data["candidates"][0]["env"]["MODE"] == "readonly"
+    assert "secret" not in str(data)
+
+
+def test_import_local_mcp_server_endpoint_uses_discovered_candidate():
+    client = TestClient(app)
+    config = MCPServerConfig(
+        id="mcp_server_config:imported",
+        name="Codegraph",
+        command="codegraph-mcp",
+        metadata={"local_discovery_signature": "sig"},
+    )
+
+    with (
+        patch(
+            "api.routers.mcp_servers.import_local_mcp_server",
+            new_callable=AsyncMock,
+            return_value=config,
+        ) as import_mock,
+    ):
+        response = client.post(
+            "/api/mcp/import-local",
+            json={"candidate_id": "codex:abc", "enabled": True},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["id"] == "mcp_server_config:imported"
+    import_mock.assert_awaited_once_with("codex:abc", enabled=True)
+
+
+def test_runtime_url_rewrites_loopback_for_configured_runtime_host(monkeypatch):
+    monkeypatch.setenv("OPEN_NOTEBOOK_MCP_LOCALHOST_HOST", "host.docker.internal")
+
+    url, metadata = _runtime_url_and_metadata("http://127.0.0.1:8817/mcp")
+
+    assert url == "http://host.docker.internal:8817/mcp"
+    assert metadata["host_header"] == "127.0.0.1:8817"
+    assert metadata["original_url"] == "http://127.0.0.1:8817/mcp"
 
 
 def test_test_mcp_server_endpoint_lists_tools():

@@ -1,9 +1,12 @@
 import asyncio
 import os
+from contextlib import asynccontextmanager
 from typing import Any
 
 from mcp import ClientSession, StdioServerParameters
+from mcp.client.sse import sse_client
 from mcp.client.stdio import stdio_client
+from mcp.client.streamable_http import streamablehttp_client
 
 from open_notebook.domain.mcp_server_config import MCPServerConfig
 
@@ -93,34 +96,84 @@ def normalize_mcp_tool_result(result: Any) -> dict[str, Any]:
     }
 
 
-async def list_mcp_tools(config: MCPServerConfig) -> list[dict[str, Any]]:
-    if config.transport != "stdio":
+def _mcp_headers(config: MCPServerConfig) -> dict[str, str] | None:
+    headers: dict[str, str] = {}
+    host_header = config.metadata.get("host_header")
+    if isinstance(host_header, str) and host_header.strip():
+        headers["Host"] = host_header.strip()
+    if not config.auth_env_var:
+        return headers or None
+    token = os.getenv(config.auth_env_var)
+    if not token:
         raise MCPClientError(
-            f"MCP transport '{config.transport}' is configured but only stdio "
-            "tool inspection is implemented in this slice."
+            f"MCP auth environment variable '{config.auth_env_var}' is not set"
         )
-    if not config.command:
-        raise MCPClientError("stdio MCP server command is required")
+    headers["Authorization"] = f"Bearer {token}"
+    return headers
 
-    env = os.environ.copy()
-    env.update(config.env)
-    params = StdioServerParameters(
-        command=config.command,
-        args=config.args,
-        env=env,
+
+@asynccontextmanager
+async def _mcp_session(config: MCPServerConfig):
+    if config.transport == "stdio":
+        if not config.command:
+            raise MCPClientError("stdio MCP server command is required")
+
+        env = os.environ.copy()
+        env.update(config.env)
+        params = StdioServerParameters(
+            command=config.command,
+            args=config.args,
+            env=env,
+        )
+        async with stdio_client(params) as (read_stream, write_stream):
+            async with ClientSession(read_stream, write_stream) as session:
+                await session.initialize()
+                yield session
+        return
+
+    if not config.url:
+        raise MCPClientError(f"{config.transport} MCP server URL is required")
+
+    headers = _mcp_headers(config)
+    if config.transport == "http":
+        async with streamablehttp_client(
+            config.url,
+            headers=headers,
+            timeout=config.timeout,
+        ) as (read_stream, write_stream, _):
+            async with ClientSession(read_stream, write_stream) as session:
+                await session.initialize()
+                yield session
+        return
+
+    if config.transport == "sse":
+        async with sse_client(
+            config.url,
+            headers=headers,
+            timeout=config.timeout,
+        ) as (read_stream, write_stream):
+            async with ClientSession(read_stream, write_stream) as session:
+                await session.initialize()
+                yield session
+        return
+
+    raise MCPClientError(
+        f"MCP transport '{config.transport}' is configured but is not supported"
     )
 
+
+async def list_mcp_tools(config: MCPServerConfig) -> list[dict[str, Any]]:
     try:
         async with asyncio.timeout(config.timeout):
-            async with stdio_client(params) as (read_stream, write_stream):
-                async with ClientSession(read_stream, write_stream) as session:
-                    await session.initialize()
-                    result = await session.list_tools()
-                    return [normalize_mcp_tool(config, tool) for tool in result.tools]
+            async with _mcp_session(config) as session:
+                result = await session.list_tools()
+                return [normalize_mcp_tool(config, tool) for tool in result.tools]
     except TimeoutError as exc:
         raise MCPClientError(
             f"MCP server '{config.name}' timed out after {config.timeout}s"
         ) from exc
+    except MCPClientError:
+        raise
     except Exception as exc:
         raise MCPClientError(f"MCP server '{config.name}' failed: {exc}") from exc
 
@@ -145,32 +198,14 @@ async def call_mcp_tool(
             f"MCP tool '{tool_name}' is classified as mutating and cannot be "
             "called from a read-only workflow"
         )
-    if config.transport != "stdio":
-        raise MCPClientError(
-            f"MCP transport '{config.transport}' is configured but only stdio "
-            "tool calls are implemented in this slice."
-        )
-    if not config.command:
-        raise MCPClientError("stdio MCP server command is required")
-
-    env = os.environ.copy()
-    env.update(config.env)
-    params = StdioServerParameters(
-        command=config.command,
-        args=config.args,
-        env=env,
-    )
-
     try:
         async with asyncio.timeout(config.timeout):
-            async with stdio_client(params) as (read_stream, write_stream):
-                async with ClientSession(read_stream, write_stream) as session:
-                    await session.initialize()
-                    result = await session.call_tool(tool_name, arguments or {})
-                    normalized = normalize_mcp_tool_result(result)
-                    normalized["tool_name"] = tool_name
-                    normalized["permission"] = permission
-                    return normalized
+            async with _mcp_session(config) as session:
+                result = await session.call_tool(tool_name, arguments or {})
+                normalized = normalize_mcp_tool_result(result)
+                normalized["tool_name"] = tool_name
+                normalized["permission"] = permission
+                return normalized
     except TimeoutError as exc:
         raise MCPClientError(
             f"MCP tool '{tool_name}' timed out after {config.timeout}s"
