@@ -28,6 +28,7 @@ TEST_MODELS = {
     "voyage": ("voyage-3-lite", "embedding"),
     "elevenlabs": ("eleven_multilingual_v2", "text_to_speech"),
     "deepgram": ("aura-2-thalia-en", "text_to_speech"),
+    "assemblyai": ("universal-3-pro", "speech_to_text"),
     "ollama": (None, "language"),  # Dynamic - will use first available model
     # Complex providers with additional configuration
     "vertex": ("gemini-2.0-flash", "language"),  # Uses Google Vertex AI

@@ -52,7 +52,7 @@ OPENAI_MODEL_TYPES = {
         "ada",
     ],
     "embedding": ["text-embedding", "embedding"],
-    "speech_to_text": ["whisper"],
+    "speech_to_text": ["transcribe", "whisper"],
     "text_to_speech": ["tts"],
 }
 
@@ -147,7 +147,12 @@ ELEVENLABS_MODEL_TYPES = {
 }
 
 DEEPGRAM_MODEL_TYPES = {
+    "speech_to_text": ["nova", "flux"],
     "text_to_speech": ["aura"],
+}
+
+ASSEMBLYAI_MODEL_TYPES = {
+    "speech_to_text": ["universal"],
 }
 
 DASHSCOPE_MODEL_TYPES = {
@@ -178,6 +183,7 @@ def classify_model_type(model_name: str, provider: str) -> str:
         "voyage": VOYAGE_MODEL_TYPES,
         "elevenlabs": ELEVENLABS_MODEL_TYPES,
         "deepgram": DEEPGRAM_MODEL_TYPES,
+        "assemblyai": ASSEMBLYAI_MODEL_TYPES,
         "dashscope": DASHSCOPE_MODEL_TYPES,
         "minimax": MINIMAX_MODEL_TYPES,
     }
@@ -230,6 +236,26 @@ async def discover_openai_models() -> List[DiscoveredModel]:
                     )
     except Exception as e:
         logger.warning(f"Failed to discover OpenAI models: {e}")
+
+    curated_audio_models = [
+        ("gpt-4o-mini-transcribe", "speech_to_text"),
+        ("gpt-4o-transcribe", "speech_to_text"),
+        ("gpt-4o-transcribe-diarize", "speech_to_text"),
+        ("whisper-1", "speech_to_text"),
+        ("gpt-4o-mini-tts", "text_to_speech"),
+        ("tts-1", "text_to_speech"),
+        ("tts-1-hd", "text_to_speech"),
+    ]
+    existing = {(model.name, model.model_type) for model in models}
+    for name, model_type in curated_audio_models:
+        if (name, model_type) not in existing:
+            models.append(
+                DiscoveredModel(
+                    name=name,
+                    provider="openai",
+                    model_type=model_type,
+                )
+            )
 
     return models
 
@@ -555,7 +581,7 @@ async def discover_elevenlabs_models() -> List[DiscoveredModel]:
 
 
 async def discover_deepgram_models() -> List[DiscoveredModel]:
-    """Return a curated static list of Deepgram Aura TTS voices.
+    """Return a curated static list of Deepgram STT models and Aura TTS voices.
 
     Deepgram has no model-listing API and treats each voice as a model id.
     This is a representative subset of the Aura-2 English catalog; users can
@@ -565,6 +591,12 @@ async def discover_deepgram_models() -> List[DiscoveredModel]:
     if not api_key:
         return []
 
+    deepgram_stt_models = [
+        "nova-3",
+        "nova-3-general",
+        "nova-2",
+        "flux-general-en",
+    ]
     deepgram_voices = [
         "aura-2-thalia-en",
         "aura-2-andromeda-en",
@@ -579,8 +611,38 @@ async def discover_deepgram_models() -> List[DiscoveredModel]:
     ]
 
     return [
-        DiscoveredModel(name=m, provider="deepgram", model_type="text_to_speech")
-        for m in deepgram_voices
+        *[
+            DiscoveredModel(
+                name=m,
+                provider="deepgram",
+                model_type="speech_to_text",
+            )
+            for m in deepgram_stt_models
+        ],
+        *[
+            DiscoveredModel(
+                name=m,
+                provider="deepgram",
+                model_type="text_to_speech",
+            )
+            for m in deepgram_voices
+        ],
+    ]
+
+
+async def discover_assemblyai_models() -> List[DiscoveredModel]:
+    """Return a curated static list of AssemblyAI STT models."""
+    api_key = os.environ.get("ASSEMBLYAI_API_KEY") or os.environ.get("ASSEMBLY_AI_API_KEY")
+    if not api_key:
+        return []
+
+    return [
+        DiscoveredModel(
+            name=m,
+            provider="assemblyai",
+            model_type="speech_to_text",
+        )
+        for m in ["universal-3-pro", "universal-3", "universal-2"]
     ]
 
 
@@ -748,6 +810,7 @@ PROVIDER_DISCOVERY_FUNCTIONS = {
     "voyage": discover_voyage_models,
     "elevenlabs": discover_elevenlabs_models,
     "deepgram": discover_deepgram_models,
+    "assemblyai": discover_assemblyai_models,
     "openai_compatible": discover_openai_compatible_models,
     CODEX_APP_SERVER_PROVIDER: discover_codex_app_server_models,
     "dashscope": discover_dashscope_models,

@@ -144,6 +144,7 @@ class TestCredentialModelDiscovery:
                 "name": "custom-openai-model",
                 "provider": "openai",
                 "description": None,
+                "model_type": "language",
             }
         ]
         assert requests == [
@@ -231,6 +232,10 @@ class TestAudioProviderWiring:
         assert classify_model_type("mistral-embed", "mistral") == "embedding"
         # Deepgram Aura voices
         assert classify_model_type("aura-2-thalia-en", "deepgram") == "text_to_speech"
+        assert classify_model_type("nova-3", "deepgram") == "speech_to_text"
+        assert classify_model_type("universal-3", "assemblyai") == "speech_to_text"
+        assert classify_model_type("gpt-4o-transcribe", "openai") == "speech_to_text"
+        assert classify_model_type("gpt-4o-mini-tts", "openai") == "text_to_speech"
 
     def test_provider_modalities_include_audio(self):
         from api.credentials_service import PROVIDER_MODALITIES
@@ -238,7 +243,8 @@ class TestAudioProviderWiring:
         assert "speech_to_text" in PROVIDER_MODALITIES["mistral"]
         assert "text_to_speech" in PROVIDER_MODALITIES["mistral"]
         assert "text_to_speech" in PROVIDER_MODALITIES["xai"]
-        assert PROVIDER_MODALITIES["deepgram"] == ["text_to_speech"]
+        assert PROVIDER_MODALITIES["deepgram"] == ["speech_to_text", "text_to_speech"]
+        assert PROVIDER_MODALITIES["assemblyai"] == ["speech_to_text"]
 
     def test_deepgram_has_env_and_test_model(self):
         from api.credentials_service import PROVIDER_ENV_CONFIG
@@ -246,6 +252,10 @@ class TestAudioProviderWiring:
 
         assert PROVIDER_ENV_CONFIG["deepgram"]["required"] == ["DEEPGRAM_API_KEY"]
         assert TEST_MODELS["deepgram"][1] == "text_to_speech"
+        assert PROVIDER_ENV_CONFIG["assemblyai"]["required_any"] == [
+            "ASSEMBLYAI_API_KEY",
+            "ASSEMBLY_AI_API_KEY",
+        ]
 
 
 class TestAudioMatrixWiring:

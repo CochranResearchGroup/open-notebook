@@ -230,6 +230,24 @@ class TestModelsProviderAvailability:
 
     @patch("api.routers.models.os.environ.get")
     @patch("api.routers.models.AIFactory.get_available_providers")
+    def test_assemblyai_env_enables_stt(self, mock_esperanto, mock_env, client):
+        def env_side_effect(key):
+            if key == "ASSEMBLYAI_API_KEY":
+                return "assembly-key"
+            return None
+
+        mock_env.side_effect = env_side_effect
+        mock_esperanto.return_value = {}
+
+        response = client.get("/api/models/providers")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "assemblyai" in data["available"]
+        assert data["supported_types"]["assemblyai"] == ["speech_to_text"]
+
+    @patch("api.routers.models.os.environ.get")
+    @patch("api.routers.models.AIFactory.get_available_providers")
     def test_mixed_config_generic_and_mode_specific(
         self, mock_esperanto, mock_env, client
     ):

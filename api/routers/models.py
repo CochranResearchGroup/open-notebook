@@ -554,6 +554,7 @@ async def get_provider_availability():
             "voyage": "VOYAGE_API_KEY",
             "elevenlabs": "ELEVENLABS_API_KEY",
             "deepgram": "DEEPGRAM_API_KEY",
+            "assemblyai": "ASSEMBLYAI_API_KEY",
             "ollama": "OLLAMA_API_BASE",
             "dashscope": "DASHSCOPE_API_KEY",
             "minimax": "MINIMAX_API_KEY",
@@ -570,6 +571,8 @@ async def get_provider_availability():
         # Google also supports GEMINI_API_KEY
         if not provider_status.get("google"):
             provider_status["google"] = os.environ.get("GEMINI_API_KEY") is not None
+        if not provider_status.get("assemblyai"):
+            provider_status["assemblyai"] = os.environ.get("ASSEMBLY_AI_API_KEY") is not None
 
         # Vertex: DB credential or env vars
         provider_status["vertex"] = (
@@ -619,6 +622,16 @@ async def get_provider_availability():
             # Special handling for openai-compatible to check mode-specific availability
             if provider == CODEX_APP_SERVER_PROVIDER:
                 supported_types[provider].append("language")
+            elif provider == "assemblyai":
+                supported_types[provider].append("speech_to_text")
+            elif provider == "deepgram":
+                if "speech_to_text" not in supported_types[provider]:
+                    supported_types[provider].append("speech_to_text")
+                if (
+                    "text_to_speech" in esperanto_available
+                    and provider in esperanto_available["text_to_speech"]
+                ):
+                    supported_types[provider].append("text_to_speech")
             elif provider == "openai_compatible":
                 # Esperanto exposes this provider with a hyphen ("openai-compatible"),
                 # while the rest of the codebase uses the underscore form.

@@ -73,6 +73,7 @@ const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   voyage: 'Voyage AI',
   elevenlabs: 'ElevenLabs',
   deepgram: 'Deepgram',
+  assemblyai: 'AssemblyAI',
   ollama: 'Ollama',
   azure: 'Azure OpenAI',
   vertex: 'Google Vertex AI',
@@ -85,7 +86,7 @@ const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
 // All providers in display order
 const ALL_PROVIDERS = [
   'openai', 'anthropic', 'google', 'groq', 'mistral', 'deepseek',
-  'xai', 'openrouter', 'dashscope', 'minimax', 'voyage', 'elevenlabs', 'deepgram', 'ollama',
+  'xai', 'openrouter', 'dashscope', 'minimax', 'voyage', 'elevenlabs', 'deepgram', 'assemblyai', 'ollama',
   'azure', 'vertex', 'openai_compatible', CODEX_APP_SERVER_PROVIDER,
 ]
 
@@ -101,7 +102,8 @@ const PROVIDER_MODALITIES: Record<string, ModelType[]> = {
   openrouter: ['language', 'embedding'],
   voyage: ['embedding'],
   elevenlabs: ['text_to_speech', 'speech_to_text'],
-  deepgram: ['text_to_speech'],
+  deepgram: ['speech_to_text', 'text_to_speech'],
+  assemblyai: ['speech_to_text'],
   ollama: ['language', 'embedding'],
   azure: ['language', 'embedding', 'text_to_speech', 'speech_to_text'],
   vertex: ['language', 'embedding', 'text_to_speech'],
@@ -124,6 +126,7 @@ const PROVIDER_DOCS: Record<string, string> = {
   voyage: 'https://dash.voyageai.com/api-keys',
   elevenlabs: 'https://elevenlabs.io/app/settings/api-keys',
   deepgram: 'https://console.deepgram.com/',
+  assemblyai: 'https://www.assemblyai.com/dashboard/signup',
   azure: 'https://portal.azure.com/#view/Microsoft_Azure_ProjectOxford/CognitiveServicesHub/~/OpenAI',
   vertex: 'https://cloud.google.com/vertex-ai/docs/start/cloud-environment',
   openai_compatible: 'https://github.com/lfnovo/open-notebook/blob/main/docs/5-CONFIGURATION/openai-compatible.md',
@@ -1455,6 +1458,19 @@ function DefaultModelSelectors({
     })
     .map(c => c.label)
 
+  const audioSetupItems = [
+    {
+      label: t('models.sttModelLabel'),
+      missingDefault: !defaults.default_speech_to_text_model,
+      models: getModelsForType('speech_to_text'),
+    },
+    {
+      label: t('models.ttsModelLabel'),
+      missingDefault: !defaults.default_text_to_speech_model,
+      models: getModelsForType('text_to_speech'),
+    },
+  ].filter(item => item.missingDefault || item.models.length === 0)
+
   return (
     <Card>
       <CardHeader>
@@ -1476,6 +1492,24 @@ function DefaultModelSelectors({
                 {autoAssign.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
                 {autoAssign.isPending ? t('models.autoAssigning') : t('models.autoAssign')}
               </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {audioSetupItems.length > 0 && (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              <div className="space-y-1">
+                <div className="text-sm font-medium">Audio setup needs attention</div>
+                <div className="text-xs text-muted-foreground">
+                  {audioSetupItems.map(item => (
+                    <span key={item.label} className="mr-3 inline-block">
+                      {item.label}: {item.models.length === 0 ? 'register a model' : 'select a default'}
+                    </span>
+                  ))}
+                </div>
+              </div>
             </AlertDescription>
           </Alert>
         )}

@@ -60,6 +60,10 @@ PROVIDER_CONFIG = {
     "deepgram": {
         "env_var": "DEEPGRAM_API_KEY",
     },
+    "assemblyai": {
+        "env_var": "ASSEMBLYAI_API_KEY",
+        "aliases": ["ASSEMBLY_AI_API_KEY"],
+    },
     # URL-based providers
     "ollama": {
         "env_var": "OLLAMA_API_BASE",
@@ -103,6 +107,11 @@ async def get_api_key(provider: str) -> Optional[str]:
     config_info = PROVIDER_CONFIG.get(provider.lower())
     if config_info:
         env_value = os.environ.get(config_info["env_var"])
+        if not env_value:
+            for alias in config_info.get("aliases", []):
+                env_value = os.environ.get(alias)
+                if env_value:
+                    break
         if env_value:
             logger.debug(f"Using {provider} API key from environment variable")
         return env_value
@@ -130,7 +139,10 @@ async def _provision_simple_provider(provider: str) -> bool:
 
     # Set API key / primary env var
     if cred.api_key:
-        os.environ[env_var] = cred.api_key.get_secret_value()
+        value = cred.api_key.get_secret_value()
+        os.environ[env_var] = value
+        for alias in config_info.get("aliases", []):
+            os.environ[alias] = value
         logger.debug(f"Set {env_var} from Credential")
 
     # Set base URL if present

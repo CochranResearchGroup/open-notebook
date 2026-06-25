@@ -13,6 +13,7 @@ from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.domain.base import ObjectModel, RecordModel
 from open_notebook.exceptions import ConfigurationError
 
+from .assemblyai import ASSEMBLYAI_PROVIDER, AssemblyAISpeechToTextModel
 from .codex_app_server import CODEX_APP_SERVER_PROVIDER, CodexAppServerLanguageModel
 
 ModelType = Union[
@@ -156,6 +157,11 @@ class ModelManager:
             if model.type != "language":
                 raise ConfigurationError("Codex app-server only supports language models")
             return CodexAppServerLanguageModel(model_name=model.name, config=config)
+
+        if model.provider == ASSEMBLYAI_PROVIDER:
+            if model.type != "speech_to_text":
+                raise ConfigurationError("AssemblyAI only supports speech-to-text models")
+            return AssemblyAISpeechToTextModel(model_name=model.name, config=config)
 
         # Normalize provider name: DB stores underscores but Esperanto expects hyphens
         provider = model.provider.replace("_", "-")

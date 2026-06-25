@@ -46,6 +46,7 @@ PROVIDER_ENV_CONFIG: Dict[str, dict] = {
     "voyage": {"required": ["VOYAGE_API_KEY"]},
     "elevenlabs": {"required": ["ELEVENLABS_API_KEY"]},
     "deepgram": {"required": ["DEEPGRAM_API_KEY"]},
+    "assemblyai": {"required_any": ["ASSEMBLYAI_API_KEY", "ASSEMBLY_AI_API_KEY"]},
     "ollama": {"required": ["OLLAMA_API_BASE"]},
     "vertex": {
         "required": ["VERTEX_PROJECT", "VERTEX_LOCATION"],
@@ -79,7 +80,8 @@ PROVIDER_MODALITIES: Dict[str, List[str]] = {
     "openrouter": ["language", "embedding"],
     "voyage": ["embedding"],
     "elevenlabs": ["text_to_speech", "speech_to_text"],
-    "deepgram": ["text_to_speech"],
+    "deepgram": ["speech_to_text", "text_to_speech"],
+    "assemblyai": ["speech_to_text"],
     "ollama": ["language", "embedding"],
     "vertex": ["language", "embedding", "text_to_speech"],
     "azure": ["language", "embedding", "speech_to_text", "text_to_speech"],
@@ -313,7 +315,10 @@ def create_credential_from_env(provider: str) -> Credential:
         # Simple API key providers
         config = PROVIDER_ENV_CONFIG.get(provider, {})
         required = config.get("required", [])
+        required_any = config.get("required_any", [])
         env_var = required[0] if required else None
+        if not env_var:
+            env_var = next((name for name in required_any if os.environ.get(name)), None)
         api_key = os.environ.get(env_var) if env_var else None
         return Credential(
             name=name,
@@ -460,6 +465,18 @@ async def test_credential(credential_id: str) -> dict:
                 "message": "Connection successful (key format valid)",
             }
 
+        elif test_type == "speech_to_text":
+            AIFactory.create_speech_to_text(
+                model_name=test_model,
+                provider=provider,
+                config=config,
+            )
+            return {
+                "provider": provider,
+                "success": True,
+                "message": "Connection successful (key format valid)",
+            }
+
         return {
             "provider": provider,
             "success": False,
@@ -519,10 +536,17 @@ async def discover_with_config(provider: str, config: dict) -> List[dict]:
             "scribe_v1",  # speech-to-text
         ],
         "deepgram": [
+            "nova-3", "nova-3-general", "nova-2",
+            "flux-general-en",
             "aura-2-thalia-en", "aura-2-andromeda-en", "aura-2-helena-en",
             "aura-2-apollo-en", "aura-2-arcas-en", "aura-2-asteria-en",
             "aura-2-athena-en", "aura-2-hera-en", "aura-2-hermes-en",
             "aura-2-atlas-en",
+        ],
+        "assemblyai": [
+            "universal-3-pro",
+            "universal-3",
+            "universal-2",
         ],
     }
 
@@ -530,7 +554,11 @@ async def discover_with_config(provider: str, config: dict) -> List[dict]:
         if not api_key and provider != "ollama":
             return []
         return [
-            {"name": m, "provider": provider}
+            {
+                "name": m,
+                "provider": provider,
+                "model_type": classify_model_type(m, provider),
+            }
             for m in STATIC_MODELS[provider]
         ]
 
@@ -664,15 +692,37 @@ async def discover_with_config(provider: str, config: dict) -> List[dict]:
             response.raise_for_status()
             data = response.json()
 
-            return [
+            discovered = [
                 {
                     "name": m.get("id", ""),
                     "provider": provider,
                     "description": m.get("name"),
+                    "model_type": classify_model_type(m.get("id", ""), provider),
                 }
                 for m in data.get("data", [])
                 if m.get("id")
             ]
+            if provider == "openai" and not base_url:
+                existing_names = {item["name"] for item in discovered}
+                for name, model_type in [
+                    ("gpt-4o-mini-transcribe", "speech_to_text"),
+                    ("gpt-4o-transcribe", "speech_to_text"),
+                    ("gpt-4o-transcribe-diarize", "speech_to_text"),
+                    ("whisper-1", "speech_to_text"),
+                    ("gpt-4o-mini-tts", "text_to_speech"),
+                    ("tts-1", "text_to_speech"),
+                    ("tts-1-hd", "text_to_speech"),
+                ]:
+                    if name not in existing_names:
+                        discovered.append(
+                            {
+                                "name": name,
+                                "provider": "openai",
+                                "description": None,
+                                "model_type": model_type,
+                            }
+                        )
+            return discovered
     except Exception as e:
         logger.warning(f"Failed to discover {provider} models: {e}")
         return []
