@@ -45,6 +45,10 @@ For deeper dives, check `/open_notebook/` CLAUDE.md for component-specific guida
 - Communication templates
 - Best practices
 
+For this workstation's live Open Notebook instance, use the repo-local
+**[Cooper Live Deployment Runbook](../dev/runbooks/cooper-live-deployment.md)**
+before claiming changes are available on `open-notebook.ecochran.dyndns.org`.
+
 ---
 
 ## 📚 Quick Links
@@ -61,6 +65,7 @@ For deeper dives, check `/open_notebook/` CLAUDE.md for component-specific guida
 | [API Reference](api-reference.md) | Building integrations | Complete REST API documentation |
 | [Security](security.md) | All developers | Security practices and vulnerability prevention |
 | [Maintainer Guide](maintainer-guide.md) | Maintainers | Managing issues, PRs, releases |
+| [Cooper Live Deployment](../dev/runbooks/cooper-live-deployment.md) | Local operators | Rebuild, restart, and verify the live `open-notebook-cooper` container |
 
 ---
 

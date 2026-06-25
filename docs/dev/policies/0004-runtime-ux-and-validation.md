@@ -20,6 +20,7 @@
 - For backend and cross-cutting Python changes, prefer focused pytest plus ruff, then widen when behavior is shared or user-visible.
 - For frontend changes, run the relevant frontend lint/test/build path from `frontend/`.
 - For live deployment changes, verify container state, local health endpoints, auth boundaries, and public route behavior as appropriate.
+- For changes expected to appear on `https://open-notebook.ecochran.dyndns.org/`, follow `docs/dev/runbooks/cooper-live-deployment.md` or explicitly state that the live deploy was skipped. A commit or push alone does not update the live site.
 - State exactly what validation ran, what passed, and what remains unverified.
 
 ## Closeout
