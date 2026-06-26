@@ -178,6 +178,38 @@ def test_codex_app_server_chat_model_uses_mcp_config_overrides(tmp_path):
     materialize.assert_not_awaited()
 
 
+@pytest.mark.asyncio
+async def test_codex_app_server_mcp_launch_config_inside_running_event_loop(tmp_path):
+    model = CodexAppServerChatModel(
+        model="gpt-5.5",
+        codex_bin="codex",
+        codex_home=str(tmp_path / "codex-home"),
+        cwd=str(tmp_path),
+        timeout=30,
+    )
+    overrides = ['mcp_servers.read-tools.command="read-mcp"']
+
+    with patch(
+        "open_notebook.ai.codex_app_server.build_codex_mcp_launch_config",
+        new_callable=AsyncMock,
+        return_value={
+            "enabled": True,
+            "config_overrides": overrides,
+            "codex_home": str(tmp_path / "codex-home"),
+            "cleanup_path": None,
+        },
+    ) as build_launch:
+        launch_config = model._mcp_launch_config()
+
+    assert launch_config == {
+        "enabled": True,
+        "config_overrides": overrides,
+        "codex_home": str(tmp_path / "codex-home"),
+        "cleanup_path": None,
+    }
+    build_launch.assert_awaited_once_with(codex_home=str(tmp_path / "codex-home"))
+
+
 def test_codex_app_server_chat_model_advertises_dynamic_tools(tmp_path):
     FakeCodexClient.instances = []
     tool_specs = [

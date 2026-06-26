@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import json
 import os
 import selectors
@@ -64,6 +65,20 @@ def _redacted_path_label(path_value: str | None) -> str | None:
     expanded = Path(path_value).expanduser()
     name = expanded.name or str(expanded)
     return f"configured (.../{name})"
+
+
+def _run_async_blocking(coro: Any) -> Any:
+    """Run async setup from sync LangGraph/Codex glue code."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+
+    def run_in_new_loop() -> Any:
+        return asyncio.run(coro)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        return executor.submit(run_in_new_loop).result()
 
 
 def codex_app_server_status() -> dict[str, Any]:
@@ -513,14 +528,14 @@ class CodexAppServerChatModel(BaseChatModel):
         if enabled not in {"1", "true", "yes", "on"}:
             return []
         try:
-            return asyncio.run(build_codex_dynamic_tool_specs())
+            return _run_async_blocking(build_codex_dynamic_tool_specs())
         except Exception as exc:
             logger.warning(f"Could not load Codex dynamic MCP tool specs: {exc}")
             return []
 
     def _launch_profile(self) -> str:
         try:
-            result = asyncio.run(
+            result = _run_async_blocking(
                 materialize_codex_mcp_profile(
                     codex_home=self.codex_home,
                     profile_name=self.mcp_profile_name,
@@ -536,7 +551,7 @@ class CodexAppServerChatModel(BaseChatModel):
 
     def _mcp_config_overrides(self) -> list[str]:
         try:
-            result = asyncio.run(build_codex_mcp_config_overrides())
+            result = _run_async_blocking(build_codex_mcp_config_overrides())
         except Exception as exc:
             logger.warning(f"Could not build Codex MCP config overrides: {exc}")
             return []
@@ -545,7 +560,9 @@ class CodexAppServerChatModel(BaseChatModel):
 
     def _mcp_launch_config(self) -> dict[str, Any]:
         try:
-            result = asyncio.run(build_codex_mcp_launch_config(codex_home=self.codex_home))
+            result = _run_async_blocking(
+                build_codex_mcp_launch_config(codex_home=self.codex_home)
+            )
         except Exception as exc:
             logger.warning(f"Could not build Codex MCP launch config: {exc}")
             return {
