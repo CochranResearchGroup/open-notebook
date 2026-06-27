@@ -7,7 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
-import { Bot, User, Send, Loader2, FileText, Lightbulb, StickyNote, Clock } from 'lucide-react'
+import { Bot, User, Send, Loader2, FileText, Lightbulb, StickyNote, Clock, Maximize2, Minimize2 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
@@ -26,6 +26,7 @@ import { useModalManager } from '@/lib/hooks/use-modal-manager'
 import { toast } from 'sonner'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { useIsDesktop } from '@/lib/hooks/use-media-query'
+import { cn } from '@/lib/utils'
 
 interface NotebookContextStats {
   sourcesInsights: number
@@ -81,6 +82,7 @@ export function ChatPanel({
   const { t } = useTranslation()
   const chatInputId = useId()
   const [input, setInput] = useState('')
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const [sessionManagerOpen, setSessionManagerOpen] = useState(false)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -104,6 +106,25 @@ export function ChatPanel({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  useEffect(() => {
+    if (isDesktop && isFullscreen) {
+      setIsFullscreen(false)
+    }
+  }, [isDesktop, isFullscreen])
+
+  useEffect(() => {
+    if (!isFullscreen || isDesktop) {
+      return
+    }
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isFullscreen, isDesktop])
 
   const handleSend = () => {
     if (input.trim() && !isStreaming) {
@@ -132,7 +153,12 @@ export function ChatPanel({
 
   return (
     <>
-    <Card className="flex flex-col h-full min-h-0 flex-1 overflow-hidden">
+    <Card
+      className={cn(
+        'flex flex-col h-full min-h-0 flex-1 overflow-hidden',
+        isFullscreen && !isDesktop && 'fixed inset-0 z-50 h-[100dvh] rounded-none border-0 bg-card'
+      )}
+    >
       <CardHeader className="flex-shrink-0 px-3 py-2 sm:px-6 sm:pb-3 sm:pt-6">
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="flex min-w-0 items-center gap-2 text-base sm:text-lg">
@@ -141,35 +167,51 @@ export function ChatPanel({
               {title || (contextType === 'source' ? t('chat.chatWith').replace('{name}', t('navigation.sources')) : t('chat.chatWith').replace('{name}', t('common.notebook')))}
             </span>
           </CardTitle>
-          {onSelectSession && onCreateSession && onDeleteSession && (
-            <Dialog open={sessionManagerOpen} onOpenChange={setSessionManagerOpen}>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="flex-shrink-0 gap-2 px-2 sm:px-3"
-                onClick={() => setSessionManagerOpen(true)}
-                disabled={loadingSessions}
-              >
-                <Clock className="h-4 w-4" />
-                <span className="hidden text-xs sm:inline">{t('chat.sessions')}</span>
-              </Button>
-              <DialogContent className="sm:max-w-[420px] p-0 overflow-hidden">
-                <DialogTitle className="sr-only">{t('chat.sessionsTitle')}</DialogTitle>
-                <SessionManager
-                  sessions={sessions}
-                  currentSessionId={currentSessionId ?? null}
-                  onCreateSession={(title) => onCreateSession?.(title)}
-                  onSelectSession={(sessionId) => {
-                    onSelectSession(sessionId)
-                    setSessionManagerOpen(false)
-                  }}
-                  onUpdateSession={(sessionId, title) => onUpdateSession?.(sessionId, title)}
-                  onDeleteSession={(sessionId) => onDeleteSession?.(sessionId)}
-                  loadingSessions={loadingSessions}
-                />
-              </DialogContent>
-            </Dialog>
-          )}
+          <div className="flex flex-shrink-0 items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 sm:hidden"
+              onClick={() => setIsFullscreen((value) => !value)}
+              aria-label={isFullscreen ? 'Exit full screen chat' : 'Open chat full screen'}
+              title={isFullscreen ? 'Exit full screen chat' : 'Open chat full screen'}
+            >
+              {isFullscreen ? (
+                <Minimize2 className="h-4 w-4" />
+              ) : (
+                <Maximize2 className="h-4 w-4" />
+              )}
+            </Button>
+            {onSelectSession && onCreateSession && onDeleteSession && (
+              <Dialog open={sessionManagerOpen} onOpenChange={setSessionManagerOpen}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="flex-shrink-0 gap-2 px-2 sm:px-3"
+                  onClick={() => setSessionManagerOpen(true)}
+                  disabled={loadingSessions}
+                >
+                  <Clock className="h-4 w-4" />
+                  <span className="hidden text-xs sm:inline">{t('chat.sessions')}</span>
+                </Button>
+                <DialogContent className="sm:max-w-[420px] p-0 overflow-hidden">
+                  <DialogTitle className="sr-only">{t('chat.sessionsTitle')}</DialogTitle>
+                  <SessionManager
+                    sessions={sessions}
+                    currentSessionId={currentSessionId ?? null}
+                    onCreateSession={(title) => onCreateSession?.(title)}
+                    onSelectSession={(sessionId) => {
+                      onSelectSession(sessionId)
+                      setSessionManagerOpen(false)
+                    }}
+                    onUpdateSession={(sessionId, title) => onUpdateSession?.(sessionId, title)}
+                    onDeleteSession={(sessionId) => onDeleteSession?.(sessionId)}
+                    loadingSessions={loadingSessions}
+                  />
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col min-h-0 p-0">
