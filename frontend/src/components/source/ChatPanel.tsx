@@ -25,6 +25,7 @@ import { convertReferencesToCompactMarkdown, createCompactReferenceLinkComponent
 import { useModalManager } from '@/lib/hooks/use-modal-manager'
 import { toast } from 'sonner'
 import { useTranslation } from '@/lib/hooks/use-translation'
+import { useIsDesktop } from '@/lib/hooks/use-media-query'
 
 interface NotebookContextStats {
   sourcesInsights: number
@@ -84,6 +85,7 @@ export function ChatPanel({
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { openModal } = useModalManager()
+  const isDesktop = useIsDesktop()
 
   const handleReferenceClick = (type: string, id: string) => {
     const modalType = type === 'source_insight' ? 'insight' : type as 'source' | 'note' | 'insight'
@@ -124,11 +126,14 @@ export function ChatPanel({
   // Detect platform for placeholder text
   const isMac = typeof navigator !== 'undefined' && navigator.userAgent.toUpperCase().indexOf('MAC') >= 0
   const keyHint = isMac ? '⌘+Enter' : 'Ctrl+Enter'
+  const inputPlaceholder = isDesktop
+    ? `${t('chat.sendPlaceholder')} (${t('chat.pressToSend').replace('{key}', keyHint)})`
+    : t('chat.sendPlaceholder')
 
   return (
     <>
     <Card className="flex flex-col h-full min-h-0 flex-1 overflow-hidden">
-      <CardHeader className="flex-shrink-0 px-3 py-3 sm:px-6 sm:pb-3 sm:pt-6">
+      <CardHeader className="flex-shrink-0 px-3 py-2 sm:px-6 sm:pb-3 sm:pt-6">
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="flex min-w-0 items-center gap-2 text-base sm:text-lg">
             <Bot className="h-5 w-5 flex-shrink-0" />
@@ -168,11 +173,11 @@ export function ChatPanel({
         </div>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col min-h-0 p-0">
-        <ScrollArea className="flex-1 min-h-0 px-3 sm:px-4" ref={scrollAreaRef}>
-          <div className="space-y-3 py-3 sm:space-y-4 sm:py-4">
+        <ScrollArea className="flex-1 min-h-0 px-2 sm:px-4" ref={scrollAreaRef}>
+          <div className="space-y-2 py-2 sm:space-y-4 sm:py-4">
             {messages.length === 0 ? (
-              <div className="text-center text-muted-foreground py-8">
-                <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <div className="text-center text-muted-foreground py-6 sm:py-8">
+                <Bot className="h-10 w-10 mx-auto mb-3 opacity-50 sm:h-12 sm:w-12 sm:mb-4" />
                 <p className="text-sm">
                   {t('chat.startConversation').replace('{type}', contextType === 'source' ? t('navigation.sources') : t('common.notebook'))}
                 </p>
@@ -193,9 +198,9 @@ export function ChatPanel({
                       </div>
                     </div>
                   )}
-                  <div className="flex min-w-0 max-w-[calc(100%-2.25rem)] flex-col gap-2 sm:max-w-[80%]">
+                  <div className="flex min-w-0 max-w-[calc(100%-2.25rem)] flex-col gap-1.5 sm:max-w-[80%] sm:gap-2">
                     <div
-                      className={`rounded-lg px-3 py-2 sm:px-4 ${
+                      className={`rounded-lg px-3 py-1.5 sm:px-4 sm:py-2 ${
                         message.type === 'human'
                           ? 'bg-primary text-primary-foreground'
                           : 'bg-muted'
@@ -277,15 +282,16 @@ export function ChatPanel({
             notesCount={notebookContextStats.notesCount}
             tokenCount={notebookContextStats.tokenCount}
             charCount={notebookContextStats.charCount}
+            className="py-1.5 sm:py-2"
           />
         )}
 
         {/* Input Area */}
-        <div className="flex-shrink-0 p-3 space-y-3 border-t sm:p-4">
+        <div className="flex-shrink-0 space-y-2 border-t p-2 sm:space-y-3 sm:p-4">
           {/* Model selector */}
           {onModelChange && (
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <span className="text-xs text-muted-foreground">{t('chat.model')}</span>
+            <div className="flex items-center justify-between gap-2">
+              <span className="flex-shrink-0 text-xs text-muted-foreground">{t('chat.model')}</span>
               <ModelSelector
                 currentModel={modelOverride}
                 onModelChange={onModelChange}
@@ -302,9 +308,9 @@ export function ChatPanel({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={`${t('chat.sendPlaceholder')} (${t('chat.pressToSend').replace('{key}', keyHint)})`}
+              placeholder={inputPlaceholder}
               disabled={isStreaming}
-              className="flex-1 min-h-[40px] max-h-[100px] resize-none py-2 px-3 min-w-0"
+              className="flex-1 min-h-10 max-h-20 resize-none py-2 px-3 min-w-0 sm:max-h-[100px]"
               rows={1}
             />
             <Button
@@ -344,7 +350,7 @@ function AIMessageContent({
   const LinkComponent = createCompactReferenceLinkComponent(onReferenceClick)
 
   return (
-    <div className="prose prose-sm prose-neutral dark:prose-invert max-w-none break-words prose-headings:font-semibold prose-a:text-blue-600 prose-a:break-all prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-p:mb-4 prose-p:leading-7 prose-li:mb-2">
+    <div className="prose prose-sm prose-neutral dark:prose-invert max-w-none break-words prose-headings:font-semibold prose-a:text-blue-600 prose-a:break-all prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-p:mb-2 prose-p:leading-6 prose-li:mb-1 sm:prose-p:mb-4 sm:prose-p:leading-7 sm:prose-li:mb-2">
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}

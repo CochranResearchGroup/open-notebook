@@ -52,7 +52,7 @@ export function NotebookHeader({ notebook }: NotebookHeaderProps) {
     <>
       <div className="border-b pb-3 sm:pb-6">
         <div className="space-y-2">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start justify-between gap-2 sm:items-center">
             <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
               <InlineEdit
                 id="notebook-name"
@@ -73,6 +73,7 @@ export function NotebookHeader({ notebook }: NotebookHeaderProps) {
                 size="sm"
                 onClick={handleArchiveToggle}
                 aria-label={notebook.archived ? t('notebooks.unarchive') : t('notebooks.archive')}
+                className="h-9 w-9 p-0 sm:w-auto sm:px-3"
               >
                 {notebook.archived ? (
                   <>
@@ -90,7 +91,7 @@ export function NotebookHeader({ notebook }: NotebookHeaderProps) {
                 variant="outline"
                 size="sm"
                 onClick={() => setShowDeleteDialog(true)}
-                className="text-red-600 hover:text-red-700"
+                className="h-9 w-9 p-0 text-red-600 hover:text-red-700 sm:w-auto sm:px-3"
                 aria-label={t('common.delete')}
               >
                 <Trash2 className="h-4 w-4 sm:mr-2" />
