@@ -50,38 +50,39 @@ export function NotebookHeader({ notebook }: NotebookHeaderProps) {
 
   return (
     <>
-      <div className="border-b pb-6">
+      <div className="border-b pb-3 sm:pb-6">
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 flex-1">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
               <InlineEdit
                 id="notebook-name"
                 name="notebook-name"
                 value={notebook.name}
                 onSave={handleUpdateName}
-                className="text-2xl font-bold"
-                inputClassName="text-2xl font-bold"
+                className="min-w-0 break-words text-xl font-bold leading-tight sm:text-2xl"
+                inputClassName="text-xl font-bold sm:text-2xl"
                 placeholder={t('notebooks.namePlaceholder')}
               />
               {notebook.archived && (
                 <Badge variant="secondary">{t('notebooks.archived')}</Badge>
               )}
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-shrink-0 gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleArchiveToggle}
+                aria-label={notebook.archived ? t('notebooks.unarchive') : t('notebooks.archive')}
               >
                 {notebook.archived ? (
                   <>
-                    <ArchiveRestore className="h-4 w-4 mr-2" />
-                    {t('notebooks.unarchive')}
+                    <ArchiveRestore className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">{t('notebooks.unarchive')}</span>
                   </>
                 ) : (
                   <>
-                    <Archive className="h-4 w-4 mr-2" />
-                    {t('notebooks.archive')}
+                    <Archive className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">{t('notebooks.archive')}</span>
                   </>
                 )}
               </Button>
@@ -90,9 +91,10 @@ export function NotebookHeader({ notebook }: NotebookHeaderProps) {
                 size="sm"
                 onClick={() => setShowDeleteDialog(true)}
                 className="text-red-600 hover:text-red-700"
+                aria-label={t('common.delete')}
               >
-                <Trash2 className="h-4 w-4 mr-2" />
-                {t('common.delete')}
+                <Trash2 className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">{t('common.delete')}</span>
               </Button>
             </div>
           </div>
@@ -102,16 +104,20 @@ export function NotebookHeader({ notebook }: NotebookHeaderProps) {
             name="notebook-description"
             value={notebook.description || ''}
             onSave={handleUpdateDescription}
-            className="text-muted-foreground"
+            className="break-words text-muted-foreground"
             inputClassName="text-muted-foreground"
             placeholder={t('notebooks.addDescription')}
             multiline
             emptyText={t('notebooks.addDescription')}
           />
           
-          <div className="text-sm text-muted-foreground">
-            {t('common.created').replace('{time}', formatDistanceToNow(new Date(notebook.created), { addSuffix: true, locale: dfLocale }))} • 
-            {t('common.updated').replace('{time}', formatDistanceToNow(new Date(notebook.updated), { addSuffix: true, locale: dfLocale }))}
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground sm:text-sm">
+            <span>
+              {t('common.created').replace('{time}', formatDistanceToNow(new Date(notebook.created), { addSuffix: true, locale: dfLocale }))}
+            </span>
+            <span>
+              {t('common.updated').replace('{time}', formatDistanceToNow(new Date(notebook.updated), { addSuffix: true, locale: dfLocale }))}
+            </span>
           </div>
         </div>
       </div>

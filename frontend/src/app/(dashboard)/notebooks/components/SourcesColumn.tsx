@@ -26,6 +26,7 @@ import type { SourceBulkAction } from '@/lib/utils/source-context'
 import { CollapsibleColumn, createCollapseButton } from '@/components/notebooks/CollapsibleColumn'
 import { useNotebookColumnsStore } from '@/lib/stores/notebook-columns-store'
 import { useTranslation } from '@/lib/hooks/use-translation'
+import { useIsDesktop } from '@/lib/hooks/use-media-query'
 
 interface SourcesColumnProps {
   sources?: SourceListResponse[]
@@ -55,6 +56,8 @@ export function SourcesColumn({
   fetchNextPage,
 }: SourcesColumnProps) {
   const { t } = useTranslation()
+  const isDesktop = useIsDesktop()
+  const sourcesLabel = t('navigation.sources')
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [addExistingDialogOpen, setAddExistingDialogOpen] = useState(false)
@@ -77,8 +80,8 @@ export function SourcesColumn({
   // Collapsible column state
   const { sourcesCollapsed, toggleSources } = useNotebookColumnsStore()
   const collapseButton = useMemo(
-    () => createCollapseButton(toggleSources, t('navigation.sources')),
-    [toggleSources, t('navigation.sources')]
+    () => createCollapseButton(toggleSources, sourcesLabel),
+    [toggleSources, sourcesLabel]
   )
 
   // Scroll container ref for infinite scroll
@@ -240,13 +243,13 @@ export function SourcesColumn({
   return (
     <>
       <CollapsibleColumn
-        isCollapsed={sourcesCollapsed}
+        isCollapsed={isDesktop && sourcesCollapsed}
         onToggle={toggleSources}
         collapsedIcon={FileText}
-        collapsedLabel={t('navigation.sources')}
+        collapsedLabel={sourcesLabel}
       >
         <Card
-          className="relative h-full flex flex-col flex-1 overflow-hidden"
+          className="relative h-full min-h-0 flex flex-col flex-1 overflow-hidden"
           onDragEnter={handleDragEnter}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -264,14 +267,14 @@ export function SourcesColumn({
               </div>
             </div>
           )}
-          <CardHeader className="pb-3 flex-shrink-0">
+          <CardHeader className="flex-shrink-0 px-3 py-3 sm:px-6 sm:pb-3 sm:pt-6">
             <div className="flex items-center justify-between gap-2">
-              <CardTitle className="text-lg">{t('navigation.sources')}</CardTitle>
+              <CardTitle className="min-w-0 truncate text-base sm:text-lg">{sourcesLabel}</CardTitle>
               <div className="flex items-center gap-2">
                 {onBulkContextModeChange && sources && sources.length > 0 && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" title={t('sources.bulkContext')}>
+                      <Button variant="ghost" size="sm" title={t('sources.bulkContext')} className="h-8 px-2 sm:px-3">
                         <ListChecks className="h-4 w-4" />
                         <ChevronDown className="h-4 w-4 ml-1" />
                       </Button>
@@ -291,10 +294,10 @@ export function SourcesColumn({
                 )}
                 <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
                   <DropdownMenuTrigger asChild>
-                    <Button size="sm">
-                      <Plus className="h-4 w-4 mr-2" />
-                      {t('sources.addSource')}
-                      <ChevronDown className="h-4 w-4 ml-2" />
+                    <Button size="sm" className="min-w-0 px-2 sm:px-3" title={t('sources.addSource')}>
+                      <Plus className="h-4 w-4 sm:mr-2" />
+                      <span className="hidden sm:inline">{t('sources.addSource')}</span>
+                      <ChevronDown className="h-4 w-4 sm:ml-2" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
@@ -313,7 +316,7 @@ export function SourcesColumn({
             </div>
           </CardHeader>
 
-          <CardContent ref={scrollContainerRef} className="flex-1 overflow-y-auto min-h-0">
+          <CardContent ref={scrollContainerRef} className="flex-1 overflow-y-auto min-h-0 px-3 pb-3 sm:px-6 sm:pb-6">
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
                 <LoadingSpinner />

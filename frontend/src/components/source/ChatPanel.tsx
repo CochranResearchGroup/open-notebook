@@ -127,24 +127,26 @@ export function ChatPanel({
 
   return (
     <>
-    <Card className="flex flex-col h-full flex-1 overflow-hidden">
-      <CardHeader className="pb-3 flex-shrink-0">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <Bot className="h-5 w-5" />
-            {title || (contextType === 'source' ? t('chat.chatWith').replace('{name}', t('navigation.sources')) : t('chat.chatWith').replace('{name}', t('common.notebook')))}
+    <Card className="flex flex-col h-full min-h-0 flex-1 overflow-hidden">
+      <CardHeader className="flex-shrink-0 px-3 py-3 sm:px-6 sm:pb-3 sm:pt-6">
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="flex min-w-0 items-center gap-2 text-base sm:text-lg">
+            <Bot className="h-5 w-5 flex-shrink-0" />
+            <span className="truncate">
+              {title || (contextType === 'source' ? t('chat.chatWith').replace('{name}', t('navigation.sources')) : t('chat.chatWith').replace('{name}', t('common.notebook')))}
+            </span>
           </CardTitle>
           {onSelectSession && onCreateSession && onDeleteSession && (
             <Dialog open={sessionManagerOpen} onOpenChange={setSessionManagerOpen}>
               <Button
                 variant="ghost"
                 size="sm"
-                className="gap-2"
+                className="flex-shrink-0 gap-2 px-2 sm:px-3"
                 onClick={() => setSessionManagerOpen(true)}
                 disabled={loadingSessions}
               >
                 <Clock className="h-4 w-4" />
-                <span className="text-xs">{t('chat.sessions')}</span>
+                <span className="hidden text-xs sm:inline">{t('chat.sessions')}</span>
               </Button>
               <DialogContent className="sm:max-w-[420px] p-0 overflow-hidden">
                 <DialogTitle className="sr-only">{t('chat.sessionsTitle')}</DialogTitle>
@@ -166,8 +168,8 @@ export function ChatPanel({
         </div>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col min-h-0 p-0">
-        <ScrollArea className="flex-1 min-h-0 px-4" ref={scrollAreaRef}>
-          <div className="space-y-4 py-4">
+        <ScrollArea className="flex-1 min-h-0 px-3 sm:px-4" ref={scrollAreaRef}>
+          <div className="space-y-3 py-3 sm:space-y-4 sm:py-4">
             {messages.length === 0 ? (
               <div className="text-center text-muted-foreground py-8">
                 <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -180,20 +182,20 @@ export function ChatPanel({
               messages.map((message) => (
                 <div
                   key={message.id}
-                  className={`flex gap-3 ${
+                  className={`flex gap-2 sm:gap-3 ${
                     message.type === 'human' ? 'justify-end' : 'justify-start'
                   }`}
                 >
                   {message.type === 'ai' && (
                     <div className="flex-shrink-0">
-                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center sm:h-8 sm:w-8">
                         <Bot className="h-4 w-4" />
                       </div>
                     </div>
                   )}
-                  <div className="flex flex-col gap-2 max-w-[80%]">
+                  <div className="flex min-w-0 max-w-[calc(100%-2.25rem)] flex-col gap-2 sm:max-w-[80%]">
                     <div
-                      className={`rounded-lg px-4 py-2 ${
+                      className={`rounded-lg px-3 py-2 sm:px-4 ${
                         message.type === 'human'
                           ? 'bg-primary text-primary-foreground'
                           : 'bg-muted'
@@ -205,7 +207,7 @@ export function ChatPanel({
                           onReferenceClick={handleReferenceClick}
                         />
                       ) : (
-                        <p className="text-sm break-all">{message.content}</p>
+                        <p className="text-sm break-words">{message.content}</p>
                       )}
                     </div>
                     {message.type === 'ai' && (
@@ -217,7 +219,7 @@ export function ChatPanel({
                   </div>
                   {message.type === 'human' && (
                     <div className="flex-shrink-0">
-                      <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
+                      <div className="h-7 w-7 rounded-full bg-primary flex items-center justify-center sm:h-8 sm:w-8">
                         <User className="h-4 w-4 text-primary-foreground" />
                       </div>
                     </div>
@@ -226,13 +228,13 @@ export function ChatPanel({
               ))
             )}
             {isStreaming && (
-              <div className="flex gap-3 justify-start">
+              <div className="flex gap-2 justify-start sm:gap-3">
                 <div className="flex-shrink-0">
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                  <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center sm:h-8 sm:w-8">
                     <Bot className="h-4 w-4" />
                   </div>
                 </div>
-                <div className="rounded-lg px-4 py-2 bg-muted">
+                <div className="rounded-lg px-3 py-2 bg-muted sm:px-4">
                   <Loader2 className="h-4 w-4 animate-spin" />
                 </div>
               </div>
@@ -243,7 +245,7 @@ export function ChatPanel({
 
         {/* Context Indicators */}
         {contextIndicators && (
-          <div className="border-t px-4 py-2">
+          <div className="border-t px-3 py-2 sm:px-4">
             <div className="flex flex-wrap gap-2 text-xs">
               {contextIndicators.sources?.length > 0 && (
                 <Badge variant="outline" className="gap-1">
@@ -279,10 +281,10 @@ export function ChatPanel({
         )}
 
         {/* Input Area */}
-        <div className="flex-shrink-0 p-4 space-y-3 border-t">
+        <div className="flex-shrink-0 p-3 space-y-3 border-t sm:p-4">
           {/* Model selector */}
           {onModelChange && (
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-xs text-muted-foreground">{t('chat.model')}</span>
               <ModelSelector
                 currentModel={modelOverride}

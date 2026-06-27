@@ -41,6 +41,7 @@ import {
   Plus,
   Wrench,
   Command,
+  X,
 } from 'lucide-react'
 
 const getNavigation = (t: TFunction) => [
@@ -85,6 +86,7 @@ export function AppSidebar() {
   const { openSourceDialog, openNotebookDialog, openPodcastDialog } = useCreateDialogs()
 
   const [createMenuOpen, setCreateMenuOpen] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isMac, setIsMac] = useState(true) // Default to Mac for SSR
 
   // Detect platform for keyboard shortcut display
@@ -106,9 +108,149 @@ export function AppSidebar() {
 
   return (
     <TooltipProvider delayDuration={0}>
+      <div className="flex h-14 flex-shrink-0 items-center justify-between border-b border-sidebar-border bg-sidebar px-3 lg:hidden">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setMobileMenuOpen(true)}
+          className="text-sidebar-foreground hover:bg-sidebar-accent"
+          aria-label="Open navigation"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+        <div className="flex min-w-0 items-center gap-2">
+          <Image src="/logo.svg" alt={t('common.appName')} width={28} height={28} />
+          <span className="truncate text-base font-medium text-sidebar-foreground">
+            {t('common.appName')}
+          </span>
+        </div>
+        <DropdownMenu open={createMenuOpen} onOpenChange={setCreateMenuOpen}>
+          <DropdownMenuTrigger asChild>
+            <Button
+              onClick={() => setCreateMenuOpen(true)}
+              variant="default"
+              size="sm"
+              className="px-2"
+              aria-label={t('common.create')}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem
+              onSelect={(event) => {
+                event.preventDefault()
+                handleCreateSelection('source')
+              }}
+              className="gap-2"
+            >
+              <FileText className="h-4 w-4" />
+              {t('common.source')}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={(event) => {
+                event.preventDefault()
+                handleCreateSelection('notebook')
+              }}
+              className="gap-2"
+            >
+              <Book className="h-4 w-4" />
+              {t('common.notebook')}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={(event) => {
+                event.preventDefault()
+                handleCreateSelection('podcast')
+              }}
+              className="gap-2"
+            >
+              <Mic className="h-4 w-4" />
+              {t('common.podcast')}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setMobileMenuOpen(false)}
+            aria-label="Close navigation"
+          />
+          <div className="relative flex h-full w-[min(21rem,85vw)] flex-col border-r border-sidebar-border bg-sidebar shadow-xl">
+            <div className="flex h-14 items-center justify-between px-4">
+              <div className="flex min-w-0 items-center gap-2">
+                <Image src="/logo.svg" alt={t('common.appName')} width={28} height={28} />
+                <span className="truncate text-base font-medium text-sidebar-foreground">
+                  {t('common.appName')}
+                </span>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-sidebar-foreground hover:bg-sidebar-accent"
+                aria-label="Close navigation"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+              {navigation.map((section, index) => (
+                <div key={section.title}>
+                  {index > 0 && <Separator className="my-3" />}
+                  <h3 className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/60">
+                    {section.title}
+                  </h3>
+                  <div className="space-y-1">
+                    {section.items.map((item) => {
+                      const isActive = pathname?.startsWith(item.href) || false
+                      return (
+                        <Link key={item.name} href={item.href} onClick={() => setMobileMenuOpen(false)}>
+                          <Button
+                            variant={isActive ? 'secondary' : 'ghost'}
+                            className={cn(
+                              'w-full justify-start gap-3 text-sidebar-foreground sidebar-menu-item',
+                              isActive && 'bg-sidebar-accent text-sidebar-accent-foreground'
+                            )}
+                          >
+                            <item.icon className="h-4 w-4" />
+                            <span>{item.name}</span>
+                          </Button>
+                        </Link>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </nav>
+
+            <div className="space-y-2 border-t border-sidebar-border p-3">
+              <ThemeToggle />
+              <LanguageToggle />
+              <Button
+                variant="outline"
+                className="w-full justify-start gap-3 sidebar-menu-item"
+                onClick={() => {
+                  setMobileMenuOpen(false)
+                  logout()
+                }}
+                aria-label={t('common.signOut')}
+              >
+                <LogOut className="h-4 w-4" />
+                {t('common.signOut')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div
         className={cn(
-          'app-sidebar flex h-full flex-col bg-sidebar border-sidebar-border border-r transition-all duration-300',
+          'app-sidebar hidden h-full flex-col bg-sidebar border-sidebar-border border-r transition-all duration-300 lg:flex',
           isCollapsed ? 'w-16' : 'w-64'
         )}
       >

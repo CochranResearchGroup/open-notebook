@@ -25,6 +25,7 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { CollapsibleColumn, createCollapseButton } from '@/components/notebooks/CollapsibleColumn'
 import { useNotebookColumnsStore } from '@/lib/stores/notebook-columns-store'
 import { useTranslation } from '@/lib/hooks/use-translation'
+import { useIsDesktop } from '@/lib/hooks/use-media-query'
 
 interface NotesColumnProps {
   notes?: NoteResponse[]
@@ -44,6 +45,8 @@ export function NotesColumn({
   onBulkContextModeChange
 }: NotesColumnProps) {
   const { t, language } = useTranslation()
+  const isDesktop = useIsDesktop()
+  const notesLabel = t('common.notes')
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [editingNote, setEditingNote] = useState<NoteResponse | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -54,8 +57,8 @@ export function NotesColumn({
   // Collapsible column state
   const { notesCollapsed, toggleNotes } = useNotebookColumnsStore()
   const collapseButton = useMemo(
-    () => createCollapseButton(toggleNotes, t('common.notes')),
-    [toggleNotes, t('common.notes')]
+    () => createCollapseButton(toggleNotes, notesLabel),
+    [toggleNotes, notesLabel]
   )
 
   const handleDeleteClick = (noteId: string) => {
@@ -78,20 +81,20 @@ export function NotesColumn({
   return (
     <>
       <CollapsibleColumn
-        isCollapsed={notesCollapsed}
+        isCollapsed={isDesktop && notesCollapsed}
         onToggle={toggleNotes}
         collapsedIcon={StickyNote}
-        collapsedLabel={t('common.notes')}
+        collapsedLabel={notesLabel}
       >
-        <Card className="h-full flex flex-col flex-1 overflow-hidden">
-          <CardHeader className="pb-3 flex-shrink-0">
+        <Card className="h-full min-h-0 flex flex-col flex-1 overflow-hidden">
+          <CardHeader className="flex-shrink-0 px-3 py-3 sm:px-6 sm:pb-3 sm:pt-6">
             <div className="flex items-center justify-between gap-2">
-              <CardTitle className="text-lg">{t('common.notes')}</CardTitle>
+              <CardTitle className="min-w-0 truncate text-base sm:text-lg">{notesLabel}</CardTitle>
               <div className="flex items-center gap-2">
                 {onBulkContextModeChange && notes && notes.length > 0 && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" title={t('sources.bulkContext')}>
+                      <Button variant="ghost" size="sm" title={t('sources.bulkContext')} className="h-8 px-2 sm:px-3">
                         <ListChecks className="h-4 w-4" />
                         <ChevronDown className="h-4 w-4 ml-1" />
                       </Button>
@@ -108,20 +111,22 @@ export function NotesColumn({
                 )}
                 <Button
                   size="sm"
+                  className="min-w-0 px-2 sm:px-3"
+                  title={t('common.writeNote')}
                   onClick={() => {
                     setEditingNote(null)
                     setShowAddDialog(true)
                   }}
                 >
-                  <Plus className="h-4 w-4 mr-2" />
-                  {t('common.writeNote')}
+                  <Plus className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">{t('common.writeNote')}</span>
                 </Button>
                 {collapseButton}
               </div>
             </div>
           </CardHeader>
 
-          <CardContent className="flex-1 overflow-y-auto min-h-0">
+          <CardContent className="flex-1 overflow-y-auto min-h-0 px-3 pb-3 sm:px-6 sm:pb-6">
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
                 <LoadingSpinner />
@@ -177,7 +182,7 @@ export function NotesColumn({
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                              className="h-8 w-8 p-0 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <MoreVertical className="h-4 w-4" />
@@ -200,11 +205,11 @@ export function NotesColumn({
                     </div>
 
                     {note.title && (
-                      <h4 className="text-sm font-medium mb-2 break-all">{note.title}</h4>
+                      <h4 className="text-sm font-medium mb-2 break-words">{note.title}</h4>
                     )}
 
                     {note.content && (
-                      <p className="text-sm text-muted-foreground line-clamp-3 break-all">
+                      <p className="text-sm text-muted-foreground line-clamp-3 break-words">
                         {note.content}
                       </p>
                     )}

@@ -40,6 +40,7 @@ export function ModelSelector({
   const [selectedModel, setSelectedModel] = useState(currentModel || 'default')
   const { data: models, isLoading } = useModels()
   const { data: defaults } = useModelDefaults()
+  const defaultLabel = t('common.default')
 
   useEffect(() => {
     setSelectedModel(currentModel || 'default')
@@ -67,8 +68,8 @@ export function ModelSelector({
     if (defaultModel) {
       return defaultModel.name
     }
-    return t('common.default')
-  }, [currentModel, languageModels, defaultModel, t('common.default')])
+    return defaultLabel
+  }, [currentModel, languageModels, defaultModel, defaultLabel])
 
   const handleSave = () => {
     onModelChange(selectedModel === 'default' ? undefined : selectedModel)
@@ -88,10 +89,10 @@ export function ModelSelector({
           variant="outline" 
           size="sm"
           disabled={disabled}
-          className="gap-2"
+          className="max-w-full min-w-0 gap-2"
         >
           <Settings2 className="h-4 w-4" />
-          <span className="text-xs">
+          <span className="truncate text-xs">
             {currentModelName}
           </span>
         </Button>
@@ -158,7 +159,7 @@ export function ModelSelector({
             </div>
           )}
         </div>
-        <DialogFooter className="flex justify-between">
+        <DialogFooter className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
           <Button variant="outline" onClick={handleReset}>
             {t('common.resetToDefault')}
           </Button>
