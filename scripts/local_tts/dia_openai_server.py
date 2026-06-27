@@ -35,6 +35,7 @@ DEFAULT_CFG_SCALE = float(os.environ.get("DIA_CFG_SCALE", "3.0"))
 DEFAULT_TEMPERATURE = float(os.environ.get("DIA_TEMPERATURE", "1.3"))
 DEFAULT_TOP_P = float(os.environ.get("DIA_TOP_P", "0.95"))
 DEFAULT_CFG_FILTER_TOP_K = int(os.environ.get("DIA_CFG_FILTER_TOP_K", "45"))
+MAX_AUDIO_PROMPT_SECONDS = float(os.environ.get("DIA_AUDIO_PROMPT_MAX_SECONDS", "10"))
 DIA_TRANSCRIPTION_URL = os.environ.get("DIA_TRANSCRIPTION_URL", "").strip()
 DIA_TRANSCRIPTION_AUTH_BEARER = (
     os.environ.get("DIA_TRANSCRIPTION_AUTH_BEARER")
@@ -217,11 +218,26 @@ async def _write_upload_to_temp(audio_file: UploadFile) -> str:
         raise HTTPException(status_code=400, detail="Audio prompt file is empty")
     temp_audio = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
     try:
-        temp_audio.write(content)
+        temp_audio.write(_trim_audio_prompt_bytes(content))
         temp_audio.flush()
         return temp_audio.name
     finally:
         temp_audio.close()
+
+
+def _trim_audio_prompt_bytes(content: bytes) -> bytes:
+    if MAX_AUDIO_PROMPT_SECONDS <= 0:
+        return content
+    try:
+        audio, sample_rate = sf.read(io.BytesIO(content), always_2d=True, dtype="float32")
+    except Exception:
+        return content
+    max_samples = max(1, int(sample_rate * MAX_AUDIO_PROMPT_SECONDS))
+    if audio.shape[0] <= max_samples:
+        return content
+    buffer = io.BytesIO()
+    sf.write(buffer, audio[:max_samples], sample_rate, format="WAV")
+    return buffer.getvalue()
 
 
 def _ui_html() -> str:
@@ -378,6 +394,7 @@ def health() -> dict[str, object]:
             "temperature": DEFAULT_TEMPERATURE,
             "top_p": DEFAULT_TOP_P,
             "cfg_filter_top_k": DEFAULT_CFG_FILTER_TOP_K,
+            "audio_prompt_max_seconds": MAX_AUDIO_PROMPT_SECONDS,
         },
     }
 

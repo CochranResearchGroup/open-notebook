@@ -179,6 +179,8 @@ Useful environment variables:
 | `DIA_SAMPLE_RATE` | `44100` |
 | `DIA_DEFAULT_VOICE` | `dialogue` |
 | `DIA_MAX_TOKENS` | `860` |
+| `DIA_AUDIO_PROMPT_MAX_SECONDS` | `10` |
+| `DIA_AUDIO_PROMPT_MIN_GENERATION_TOKENS` | `128` |
 | `DIA_TRANSCRIPTION_URL` | unset |
 | `DIA_TRANSCRIPTION_AUTH_BEARER` | `OPEN_NOTEBOOK_PASSWORD` when set |
 | `DIA_TRANSCRIPTION_TIMEOUT` | `600` |
@@ -187,6 +189,11 @@ Dia voice prompting requires the transcript for the uploaded sample. When
 `DIA_TRANSCRIPTION_URL` points at Open Notebook's `/api/audio/transcriptions`
 endpoint, the wrapper can transcribe the uploaded sample with the configured
 default speech-to-text model and prepend that transcript to the Dia prompt.
+Uploaded samples longer than `DIA_AUDIO_PROMPT_MAX_SECONDS` are clipped before
+generation because Dia's decoder cannot prefill arbitrary-length reference
+audio; short 5-10 second references are the intended model contract. The
+runtime also clips prompts to leave at least
+`DIA_AUDIO_PROMPT_MIN_GENERATION_TOKENS` decoder tokens for generated speech.
 
 Example for the Cooper container:
 

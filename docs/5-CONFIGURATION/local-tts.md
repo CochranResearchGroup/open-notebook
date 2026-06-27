@@ -221,7 +221,12 @@ It accepts multipart form data with `file`, optional `language`, and optional
 `prompt`, then returns the transcription from `default_speech_to_text_model`.
 The Dia wrapper exposes the same convenience at `/v1/audio/transcriptions` and
 uses it automatically from `/v1/audio/speech-form` when a voice sample is
-uploaded without a transcript.
+uploaded without a transcript. The wrapper clips uploaded voice samples to
+`DIA_AUDIO_PROMPT_MAX_SECONDS`, defaulting to 10 seconds, before generation.
+This keeps Dia inside its fixed decoder prefill window and reserves at least
+`DIA_AUDIO_PROMPT_MIN_GENERATION_TOKENS`, defaulting to 128, for generated
+speech. Use short 5-10 second reference samples for reliable voice
+conditioning.
 
 On the Cooper WSL deployment these are exposed for inspection as:
 
