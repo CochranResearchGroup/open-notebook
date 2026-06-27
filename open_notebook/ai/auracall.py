@@ -93,6 +93,17 @@ def _raise_for_http_error(response: httpx.Response) -> None:
     raise RuntimeError(f"AuraCall API error: {message}")
 
 
+def _response_json(response: httpx.Response) -> dict[str, Any]:
+    try:
+        data = response.json()
+    except Exception:
+        _raise_for_http_error(response)
+        raise RuntimeError("AuraCall API response was not valid JSON")
+    if not isinstance(data, dict):
+        raise RuntimeError("AuraCall API response was not a JSON object")
+    return data
+
+
 class AuraCallChatModel(BaseChatModel):
     model: str = Field(default=DEFAULT_AURACALL_MODEL)
     api_key: str | None = Field(
@@ -240,13 +251,17 @@ class AuraCallChatModel(BaseChatModel):
                 headers=self._headers(),
                 json=self._completion_payload(messages, kwargs),
             )
-            _raise_for_http_error(response)
-            data = response.json()
+            data = _response_json(response)
             text = self._final_text_from_chat_completion(data)
             if text is not None:
+                _raise_for_http_error(response)
                 return text
+            # AuraCall may encode the pollable pending state in a non-2xx HTTP
+            # response. Treat that provider-specific error as a recoverable
+            # execution state before applying generic HTTP error handling.
             response_id = self._pending_response_id(data)
             if not response_id:
+                _raise_for_http_error(response)
                 raise RuntimeError("AuraCall pending response did not include response_id")
             return self._poll_response(client, response_id)
 
@@ -257,13 +272,14 @@ class AuraCallChatModel(BaseChatModel):
                 headers=self._headers(),
                 json=self._completion_payload(messages, kwargs),
             )
-            _raise_for_http_error(response)
-            data = response.json()
+            data = _response_json(response)
             text = self._final_text_from_chat_completion(data)
             if text is not None:
+                _raise_for_http_error(response)
                 return text
             response_id = self._pending_response_id(data)
             if not response_id:
+                _raise_for_http_error(response)
                 raise RuntimeError("AuraCall pending response did not include response_id")
             return await self._apoll_response(client, response_id)
 

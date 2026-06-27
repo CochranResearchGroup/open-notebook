@@ -106,6 +106,58 @@ def test_auracall_chat_model_polls_pending_chat_completion(monkeypatch):
     assert paths == ["/v1/chat/completions", "/v1/responses/resp_123"]
 
 
+def test_auracall_chat_model_polls_non_2xx_pending_chat_completion(monkeypatch):
+    paths: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        paths.append(request.url.path)
+        if request.url.path == "/v1/chat/completions":
+            return httpx.Response(
+                504,
+                json={
+                    "error": {
+                        "type": "auracall_execution_pending",
+                        "message": "Poll /v1/responses/{response_id}",
+                        "response_id": "resp_pending_error",
+                        "response_status": "in_progress",
+                    }
+                },
+            )
+        if request.url.path == "/v1/responses/resp_pending_error":
+            return httpx.Response(
+                200,
+                json={
+                    "id": "resp_pending_error",
+                    "status": "completed",
+                    "output": [
+                        {
+                            "type": "message",
+                            "content": [
+                                {"type": "output_text", "text": "Recovered answer"}
+                            ],
+                        }
+                    ],
+                },
+            )
+        raise AssertionError(f"unexpected path {request.url.path}")
+
+    monkeypatch.setattr(
+        "open_notebook.ai.auracall.httpx.Client",
+        lambda timeout: _mock_client(handler),
+    )
+
+    model = AuraCallChatModel(
+        model="agent:pro",
+        api_key="test-key",
+        base_url="http://auracall.local/v1",
+        poll_interval=0,
+    )
+    response = model.invoke([HumanMessage(content="Hi")])
+
+    assert response.content == "Recovered answer"
+    assert paths == ["/v1/chat/completions", "/v1/responses/resp_pending_error"]
+
+
 def test_auracall_language_model_returns_langchain_adapter():
     model = AuraCallLanguageModel(
         model_name="agent:medium",
