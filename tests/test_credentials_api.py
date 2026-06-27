@@ -245,6 +245,7 @@ class TestAudioProviderWiring:
         assert "text_to_speech" in PROVIDER_MODALITIES["xai"]
         assert PROVIDER_MODALITIES["deepgram"] == ["speech_to_text", "text_to_speech"]
         assert PROVIDER_MODALITIES["assemblyai"] == ["speech_to_text"]
+        assert PROVIDER_MODALITIES["auracall"] == ["language"]
 
     def test_deepgram_has_env_and_test_model(self):
         from api.credentials_service import PROVIDER_ENV_CONFIG
@@ -255,6 +256,10 @@ class TestAudioProviderWiring:
         assert PROVIDER_ENV_CONFIG["assemblyai"]["required_any"] == [
             "ASSEMBLYAI_API_KEY",
             "ASSEMBLY_AI_API_KEY",
+        ]
+        assert PROVIDER_ENV_CONFIG["auracall"]["required_any"] == [
+            "AURACALL_BASE_URL",
+            "AURACALL_API_KEY",
         ]
 
 

@@ -17,6 +17,7 @@ from typing import Optional
 
 from loguru import logger
 
+from open_notebook.ai.auracall import AURACALL_PROVIDER
 from open_notebook.domain.credential import Credential
 
 # =============================================================================
@@ -255,6 +256,35 @@ async def _provision_openai_compatible() -> bool:
     return any_set
 
 
+async def _provision_auracall() -> bool:
+    """
+    Set environment variables for AuraCall from DB config.
+
+    AuraCall uses OpenAI-compatible HTTP semantics, so also populate the
+    generic OpenAI-compatible variables for provider libraries that only know
+    that provider name.
+    """
+    any_set = False
+
+    cred = await _get_default_credential(AURACALL_PROVIDER)
+    if not cred:
+        return False
+
+    if cred.api_key:
+        value = cred.api_key.get_secret_value()
+        os.environ["AURACALL_API_KEY"] = value
+        os.environ["OPENAI_COMPATIBLE_API_KEY"] = value
+        logger.debug("Set AURACALL_API_KEY from Credential")
+        any_set = True
+    if cred.base_url:
+        os.environ["AURACALL_BASE_URL"] = cred.base_url
+        os.environ["OPENAI_COMPATIBLE_BASE_URL"] = cred.base_url
+        logger.debug("Set AURACALL_BASE_URL from Credential")
+        any_set = True
+
+    return any_set
+
+
 async def provision_provider_keys(provider: str) -> bool:
     """
     Provision environment variables from database for a specific provider.
@@ -287,6 +317,8 @@ async def provision_provider_keys(provider: str) -> bool:
         return await _provision_azure()
     elif provider_lower in ("openai-compatible", "openai_compatible"):
         return await _provision_openai_compatible()
+    elif provider_lower == AURACALL_PROVIDER:
+        return await _provision_auracall()
 
     # Handle simple providers
     return await _provision_simple_provider(provider_lower)
@@ -315,5 +347,6 @@ async def provision_all_keys() -> dict[str, bool]:
     results["vertex"] = await provision_provider_keys("vertex")
     results["azure"] = await provision_provider_keys("azure")
     results["openai_compatible"] = await provision_provider_keys("openai_compatible")
+    results[AURACALL_PROVIDER] = await provision_provider_keys(AURACALL_PROVIDER)
 
     return results

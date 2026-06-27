@@ -59,6 +59,7 @@ import { EmbeddingModelChangeDialog } from '@/components/settings/EmbeddingModel
 
 type ModelType = 'language' | 'embedding' | 'text_to_speech' | 'speech_to_text'
 const CODEX_APP_SERVER_PROVIDER = 'codex_app_server'
+const AURACALL_PROVIDER = 'auracall'
 
 // Provider display names
 const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
@@ -78,6 +79,7 @@ const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   azure: 'Azure OpenAI',
   vertex: 'Google Vertex AI',
   openai_compatible: 'OpenAI Compatible',
+  auracall: 'AuraCall',
   codex_app_server: 'Codex App Server',
   dashscope: 'DashScope (Qwen)',
   minimax: 'MiniMax',
@@ -87,7 +89,7 @@ const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
 const ALL_PROVIDERS = [
   'openai', 'anthropic', 'google', 'groq', 'mistral', 'deepseek',
   'xai', 'openrouter', 'dashscope', 'minimax', 'voyage', 'elevenlabs', 'deepgram', 'assemblyai', 'ollama',
-  'azure', 'vertex', 'openai_compatible', CODEX_APP_SERVER_PROVIDER,
+  'azure', 'vertex', 'openai_compatible', AURACALL_PROVIDER, CODEX_APP_SERVER_PROVIDER,
 ]
 
 // Default modalities per provider
@@ -108,6 +110,7 @@ const PROVIDER_MODALITIES: Record<string, ModelType[]> = {
   azure: ['language', 'embedding', 'text_to_speech', 'speech_to_text'],
   vertex: ['language', 'embedding', 'text_to_speech'],
   openai_compatible: ['language', 'embedding', 'text_to_speech', 'speech_to_text'],
+  auracall: ['language'],
   codex_app_server: ['language'],
   dashscope: ['language'],
   minimax: ['language'],
@@ -130,6 +133,7 @@ const PROVIDER_DOCS: Record<string, string> = {
   azure: 'https://portal.azure.com/#view/Microsoft_Azure_ProjectOxford/CognitiveServicesHub/~/OpenAI',
   vertex: 'https://cloud.google.com/vertex-ai/docs/start/cloud-environment',
   openai_compatible: 'https://github.com/lfnovo/open-notebook/blob/main/docs/5-CONFIGURATION/openai-compatible.md',
+  auracall: 'https://github.com/ecochran/open-notebook/blob/main/docs/5-CONFIGURATION/auracall.md',
   codex_app_server: 'https://github.com/lfnovo/open-notebook/blob/main/README.md#ai-provider-setup',
   dashscope: 'https://help.aliyun.com/zh/model-studio/getting-started/',
   minimax: 'https://platform.minimaxi.com/document/Guides',
@@ -181,7 +185,7 @@ function CredentialFormDialog({
 
   const isVertex = provider === 'vertex'
   const isOllama = provider === 'ollama'
-  const isOpenAICompatible = provider === 'openai_compatible'
+  const isOpenAICompatible = provider === 'openai_compatible' || provider === AURACALL_PROVIDER
   const requiresApiKey = !isVertex && !isOllama && !isOpenAICompatible
 
   const [name, setName] = useState('')

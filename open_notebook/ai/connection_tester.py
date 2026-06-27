@@ -13,6 +13,8 @@ from typing import Optional, Tuple
 import httpx
 from loguru import logger
 
+from open_notebook.ai.auracall import AURACALL_PROVIDER
+
 # Test models for each provider - uses minimal/cheapest models for testing
 # Format: (model_name, model_type)
 TEST_MODELS = {
@@ -34,6 +36,7 @@ TEST_MODELS = {
     "vertex": ("gemini-2.0-flash", "language"),  # Uses Google Vertex AI
     "azure": ("gpt-35-turbo", "language"),  # Azure OpenAI deployment name
     "openai_compatible": (None, "language"),  # Dynamic - will use first available model
+    AURACALL_PROVIDER: (None, "language"),
     "dashscope": ("qwen-plus", "language"),
     "minimax": ("MiniMax-M2.5", "language"),
 }

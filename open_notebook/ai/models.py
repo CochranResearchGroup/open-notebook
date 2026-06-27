@@ -14,6 +14,11 @@ from open_notebook.domain.base import ObjectModel, RecordModel
 from open_notebook.exceptions import ConfigurationError
 
 from .assemblyai import ASSEMBLYAI_PROVIDER, AssemblyAISpeechToTextModel
+from .auracall import (
+    AURACALL_OPENAI_COMPATIBLE_PROVIDER,
+    AURACALL_PROVIDER,
+    AuraCallLanguageModel,
+)
 from .codex_app_server import CODEX_APP_SERVER_PROVIDER, CodexAppServerLanguageModel
 
 ModelType = Union[
@@ -22,6 +27,7 @@ ModelType = Union[
     SpeechToTextModel,
     TextToSpeechModel,
     CodexAppServerLanguageModel,
+    AuraCallLanguageModel,
 ]
 
 
@@ -163,8 +169,17 @@ class ModelManager:
                 raise ConfigurationError("AssemblyAI only supports speech-to-text models")
             return AssemblyAISpeechToTextModel(model_name=model.name, config=config)
 
-        # Normalize provider name: DB stores underscores but Esperanto expects hyphens
-        provider = model.provider.replace("_", "-")
+        if model.provider == AURACALL_PROVIDER and model.type == "language":
+            return AuraCallLanguageModel(model_name=model.name, config=config)
+
+        # Normalize provider name: DB stores underscores but Esperanto expects hyphens.
+        # AuraCall is OpenAI-compatible on the wire but remains a first-class
+        # provider label in Open Notebook's DB and UX.
+        provider = (
+            AURACALL_OPENAI_COMPATIBLE_PROVIDER
+            if model.provider == AURACALL_PROVIDER
+            else model.provider.replace("_", "-")
+        )
 
         # Create model based on type (Esperanto will cache the instance)
         if model.type == "language":

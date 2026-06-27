@@ -18,6 +18,7 @@ from loguru import logger
 from pydantic import SecretStr
 
 from api.models import CredentialResponse
+from open_notebook.ai.auracall import AURACALL_PROVIDER
 from open_notebook.ai.codex_app_server import (
     CODEX_APP_SERVER_PROVIDER,
     codex_app_server_available,
@@ -64,6 +65,7 @@ PROVIDER_ENV_CONFIG: Dict[str, dict] = {
     "openai_compatible": {
         "required_any": ["OPENAI_COMPATIBLE_BASE_URL", "OPENAI_COMPATIBLE_API_KEY"],
     },
+    AURACALL_PROVIDER: {"required_any": ["AURACALL_BASE_URL", "AURACALL_API_KEY"]},
     CODEX_APP_SERVER_PROVIDER: {"custom": "codex_app_server"},
     "dashscope": {"required": ["DASHSCOPE_API_KEY"]},
     "minimax": {"required": ["MINIMAX_API_KEY"]},
@@ -86,6 +88,7 @@ PROVIDER_MODALITIES: Dict[str, List[str]] = {
     "vertex": ["language", "embedding", "text_to_speech"],
     "azure": ["language", "embedding", "speech_to_text", "text_to_speech"],
     "openai_compatible": ["language", "embedding", "speech_to_text", "text_to_speech"],
+    AURACALL_PROVIDER: ["language"],
     CODEX_APP_SERVER_PROVIDER: ["language"],
     "dashscope": ["language"],
     "minimax": ["language"],
@@ -302,6 +305,15 @@ def create_credential_from_env(provider: str) -> Credential:
             api_key=SecretStr(api_key) if api_key else None,
             base_url=os.environ.get("OPENAI_COMPATIBLE_BASE_URL"),
         )
+    elif provider == AURACALL_PROVIDER:
+        api_key = os.environ.get("AURACALL_API_KEY")
+        return Credential(
+            name=name,
+            provider=provider,
+            modalities=modalities,
+            api_key=SecretStr(api_key) if api_key else None,
+            base_url=os.environ.get("AURACALL_BASE_URL"),
+        )
     elif provider == "google":
         # Support both GOOGLE_API_KEY and GEMINI_API_KEY (fallback)
         api_key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
@@ -400,7 +412,7 @@ async def test_credential(credential_id: str) -> dict:
             success, message = await _test_ollama_connection(base_url)
             return {"provider": provider, "success": success, "message": message}
 
-        if provider == "openai_compatible":
+        if provider in {"openai_compatible", AURACALL_PROVIDER}:
             base_url = config.get("base_url")
             api_key = config.get("api_key")
             if not base_url:
@@ -594,7 +606,7 @@ async def discover_with_config(provider: str, config: dict) -> List[dict]:
             logger.warning(f"Failed to discover Ollama models: {e}")
             return []
 
-    if provider == "openai_compatible":
+    if provider in {"openai_compatible", AURACALL_PROVIDER}:
         if not base_url:
             return []
         try:
@@ -610,12 +622,12 @@ async def discover_with_config(provider: str, config: dict) -> List[dict]:
                 response.raise_for_status()
                 data = response.json()
                 return [
-                    {"name": m.get("id", ""), "provider": "openai_compatible"}
+                    {"name": m.get("id", ""), "provider": provider}
                     for m in data.get("data", [])
                     if m.get("id")
                 ]
         except Exception as e:
-            logger.warning(f"Failed to discover openai_compatible models: {e}")
+            logger.warning(f"Failed to discover {provider} models: {e}")
             return []
 
     if provider == "azure":

@@ -17,6 +17,7 @@ from api.models import (
     ModelResponse,
     ProviderAvailabilityResponse,
 )
+from open_notebook.ai.auracall import AURACALL_PROVIDER
 from open_notebook.ai.codex_app_server import (
     CODEX_APP_SERVER_PROVIDER,
     codex_app_server_available,
@@ -148,6 +149,7 @@ PROVIDER_PRIORITY = [
     "xai",
     "openrouter",
     "ollama",
+    AURACALL_PROVIDER,
     "azure",
     "openai_compatible",
     "dashscope",
@@ -164,6 +166,11 @@ MODEL_PREFERENCES = {
     "groq": ["llama-3.3", "llama-3.1", "mixtral"],
     "dashscope": ["qwen-max", "qwen-plus", "qwen-turbo"],
     "minimax": ["MiniMax-M2.5", "MiniMax-M2.5-highspeed"],
+    AURACALL_PROVIDER: [
+        "agent:open-notebook-pro-chatgpt-soylei",
+        "agent:open-notebook-medium-chatgpt-soylei",
+        "agent:open-notebook-instant-chatgpt-soylei",
+    ],
 }
 
 
@@ -556,6 +563,7 @@ async def get_provider_availability():
             "deepgram": "DEEPGRAM_API_KEY",
             "assemblyai": "ASSEMBLYAI_API_KEY",
             "ollama": "OLLAMA_API_BASE",
+            AURACALL_PROVIDER: "AURACALL_API_KEY",
             "dashscope": "DASHSCOPE_API_KEY",
             "minimax": "MINIMAX_API_KEY",
         }
@@ -596,6 +604,12 @@ async def get_provider_availability():
             or _check_openai_compatible_support("EMBEDDING")
             or _check_openai_compatible_support("STT")
             or _check_openai_compatible_support("TTS")
+        )
+
+        provider_status[AURACALL_PROVIDER] = (
+            await _check_provider_has_credential(AURACALL_PROVIDER)
+            or os.environ.get("AURACALL_API_KEY") is not None
+            or os.environ.get("AURACALL_BASE_URL") is not None
         )
 
         provider_status[CODEX_APP_SERVER_PROVIDER] = codex_app_server_available()
@@ -644,6 +658,8 @@ async def get_provider_availability():
                     ):
                         if has_db_cred or _check_openai_compatible_support(mode):
                             supported_types[provider].append(model_type)
+            elif provider == AURACALL_PROVIDER:
+                supported_types[provider].append("language")
             # Special handling for azure to check mode-specific availability
             elif provider == "azure":
                 has_db_cred = await _check_provider_has_credential("azure")

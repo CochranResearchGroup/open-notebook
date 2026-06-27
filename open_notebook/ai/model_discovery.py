@@ -13,6 +13,7 @@ from typing import Dict, List, Optional, Tuple
 import httpx
 from loguru import logger
 
+from open_notebook.ai.auracall import AURACALL_PROVIDER, DEFAULT_AURACALL_BASE_URL
 from open_notebook.ai.codex_app_server import (
     CODEX_APP_SERVER_PROVIDER,
     codex_app_server_available,
@@ -714,7 +715,13 @@ async def discover_minimax_models() -> List[DiscoveredModel]:
     return models
 
 
-async def discover_openai_compatible_models() -> List[DiscoveredModel]:
+async def _discover_openai_style_models(
+    provider: str,
+    credential_provider: str,
+    base_url_env: str,
+    api_key_env: str,
+    default_base_url: str = "",
+) -> List[DiscoveredModel]:
     """
     Fetch available models from an OpenAI-compatible API endpoint.
     Uses the configured base_url from the database or environment variable.
@@ -724,23 +731,23 @@ async def discover_openai_compatible_models() -> List[DiscoveredModel]:
 
     # Try to get config from Credential database first
     try:
-        credentials = await Credential.get_by_provider("openai_compatible")
+        credentials = await Credential.get_by_provider(credential_provider)
         if credentials:
             cred = credentials[0]
             config = cred.to_esperanto_config()
             api_key = config.get("api_key")
             base_url = config.get("base_url", "").rstrip("/")
     except Exception as e:
-        logger.warning(f"Failed to read openai_compatible config from Credential: {e}")
+        logger.warning(f"Failed to read {provider} config from Credential: {e}")
 
     # Fall back to environment variables
     if not api_key:
-        api_key = os.environ.get("OPENAI_COMPATIBLE_API_KEY")
+        api_key = os.environ.get(api_key_env)
     if not base_url:
-        base_url = os.environ.get("OPENAI_COMPATIBLE_BASE_URL", "").rstrip("/")
+        base_url = os.environ.get(base_url_env, default_base_url).rstrip("/")
 
     if not base_url:
-        logger.warning("No base_url configured for openai_compatible provider")
+        logger.warning(f"No base_url configured for {provider} provider")
         return []
 
     models = []
@@ -766,16 +773,35 @@ async def discover_openai_compatible_models() -> List[DiscoveredModel]:
                     models.append(
                         DiscoveredModel(
                             name=model_id,
-                            provider="openai_compatible",
+                            provider=provider,
                             model_type=model_type,
                         )
                     )
     except httpx.HTTPStatusError as e:
-        logger.warning(f"Failed to discover openai_compatible models: HTTP {e.response.status_code}")
+        logger.warning(f"Failed to discover {provider} models: HTTP {e.response.status_code}")
     except Exception as e:
-        logger.warning(f"Failed to discover openai_compatible models: {e}")
+        logger.warning(f"Failed to discover {provider} models: {e}")
 
     return models
+
+
+async def discover_openai_compatible_models() -> List[DiscoveredModel]:
+    return await _discover_openai_style_models(
+        provider="openai_compatible",
+        credential_provider="openai_compatible",
+        base_url_env="OPENAI_COMPATIBLE_BASE_URL",
+        api_key_env="OPENAI_COMPATIBLE_API_KEY",
+    )
+
+
+async def discover_auracall_models() -> List[DiscoveredModel]:
+    return await _discover_openai_style_models(
+        provider=AURACALL_PROVIDER,
+        credential_provider=AURACALL_PROVIDER,
+        base_url_env="AURACALL_BASE_URL",
+        api_key_env="AURACALL_API_KEY",
+        default_base_url=DEFAULT_AURACALL_BASE_URL,
+    )
 
 
 async def discover_codex_app_server_models() -> List[DiscoveredModel]:
@@ -812,6 +838,7 @@ PROVIDER_DISCOVERY_FUNCTIONS = {
     "deepgram": discover_deepgram_models,
     "assemblyai": discover_assemblyai_models,
     "openai_compatible": discover_openai_compatible_models,
+    AURACALL_PROVIDER: discover_auracall_models,
     CODEX_APP_SERVER_PROVIDER: discover_codex_app_server_models,
     "dashscope": discover_dashscope_models,
     "minimax": discover_minimax_models,
