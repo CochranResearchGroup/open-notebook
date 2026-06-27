@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
-import { SourceListResponse } from '@/lib/types/api'
+import { useState, useMemo, useRef, useCallback, useEffect, type DragEvent } from 'react'
+import type { CreateSourceRequest, SourceListResponse } from '@/lib/types/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -10,13 +10,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Plus, FileText, Link2, ChevronDown, Loader2, ListChecks } from 'lucide-react'
+import { Plus, FileText, Link2, ChevronDown, Loader2, ListChecks, Upload } from 'lucide-react'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { EmptyState } from '@/components/common/EmptyState'
 import { AddSourceDialog } from '@/components/sources/AddSourceDialog'
 import { AddExistingSourceDialog } from '@/components/sources/AddExistingSourceDialog'
 import { SourceCard } from '@/components/sources/SourceCard'
-import { useDeleteSource, useRetrySource, useRemoveSourceFromNotebook } from '@/lib/hooks/use-sources'
+import { useCreateSource, useDeleteSource, useRetrySource, useRemoveSourceFromNotebook } from '@/lib/hooks/use-sources'
+import { useSettings } from '@/lib/hooks/use-settings'
+import { useTransformations } from '@/lib/hooks/use-transformations'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { useModalManager } from '@/lib/hooks/use-modal-manager'
 import { ContextMode } from '../[id]/page'
@@ -62,9 +64,15 @@ export function SourcesColumn({
   const [sourceToRemove, setSourceToRemove] = useState<string | null>(null)
 
   const { openModal } = useModalManager()
+  const createSource = useCreateSource()
   const deleteSource = useDeleteSource()
   const retrySource = useRetrySource()
   const removeFromNotebook = useRemoveSourceFromNotebook()
+  const { data: settings } = useSettings()
+  const { data: transformations = [] } = useTransformations()
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false)
+  const [dropUploadCount, setDropUploadCount] = useState(0)
+  const dragDepthRef = useRef(0)
 
   // Collapsible column state
   const { sourcesCollapsed, toggleSources } = useNotebookColumnsStore()
@@ -75,6 +83,87 @@ export function SourcesColumn({
 
   // Scroll container ref for infinite scroll
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  const isDropUploading = dropUploadCount > 0
+  const defaultTransformationIds = useMemo(
+    () => transformations.filter((transformation) => transformation.apply_default).map((transformation) => transformation.id),
+    [transformations]
+  )
+  const shouldEmbedDroppedSources = settings?.default_embedding_option === 'always' ||
+    settings?.default_embedding_option === 'ask'
+
+  const hasDraggedFiles = (event: DragEvent<HTMLElement>) =>
+    Array.from(event.dataTransfer.types).includes('Files')
+
+  const resetDragState = () => {
+    dragDepthRef.current = 0
+    setIsDraggingFiles(false)
+  }
+
+  const handleDragEnter = (event: DragEvent<HTMLElement>) => {
+    if (!hasDraggedFiles(event)) return
+
+    event.preventDefault()
+    event.stopPropagation()
+    dragDepthRef.current += 1
+    setIsDraggingFiles(true)
+  }
+
+  const handleDragOver = (event: DragEvent<HTMLElement>) => {
+    if (!hasDraggedFiles(event)) return
+
+    event.preventDefault()
+    event.stopPropagation()
+    event.dataTransfer.dropEffect = 'copy'
+    setIsDraggingFiles(true)
+  }
+
+  const handleDragLeave = (event: DragEvent<HTMLElement>) => {
+    if (!hasDraggedFiles(event)) return
+
+    event.preventDefault()
+    event.stopPropagation()
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1)
+    if (dragDepthRef.current === 0) {
+      setIsDraggingFiles(false)
+    }
+  }
+
+  const handleDrop = async (event: DragEvent<HTMLElement>) => {
+    if (!hasDraggedFiles(event)) return
+
+    event.preventDefault()
+    event.stopPropagation()
+    resetDragState()
+
+    const files = Array.from(event.dataTransfer.files).filter((file) => file.name)
+    if (files.length === 0) return
+
+    setDropUploadCount(files.length)
+    try {
+      for (const file of files) {
+        const request: CreateSourceRequest & { file: File } = {
+          type: 'upload',
+          notebook_id: notebookId,
+          title: file.name,
+          file,
+          transformations: defaultTransformationIds,
+          embed: shouldEmbedDroppedSources,
+          async_processing: true,
+        }
+
+        try {
+          await createSource.mutateAsync(request)
+        } catch (error) {
+          console.error(`Failed to upload dropped file "${file.name}":`, error)
+        } finally {
+          setDropUploadCount((count) => Math.max(0, count - 1))
+        }
+      }
+    } finally {
+      setDropUploadCount(0)
+    }
+  }
 
   // Handle scroll for infinite loading
   const handleScroll = useCallback(() => {
@@ -156,7 +245,25 @@ export function SourcesColumn({
         collapsedIcon={FileText}
         collapsedLabel={t('navigation.sources')}
       >
-        <Card className="h-full flex flex-col flex-1 overflow-hidden">
+        <Card
+          className="relative h-full flex flex-col flex-1 overflow-hidden"
+          onDragEnter={handleDragEnter}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          {(isDraggingFiles || isDropUploading) && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center border-2 border-dashed border-primary bg-background/90 backdrop-blur-sm pointer-events-none">
+              <div className="flex items-center gap-2 rounded-md bg-background px-3 py-2 text-sm font-medium text-primary shadow-sm">
+                {isDropUploading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Upload className="h-4 w-4" />
+                )}
+                <span>{t('sources.dropFilesToAdd')}</span>
+              </div>
+            </div>
+          )}
           <CardHeader className="pb-3 flex-shrink-0">
             <div className="flex items-center justify-between gap-2">
               <CardTitle className="text-lg">{t('navigation.sources')}</CardTitle>

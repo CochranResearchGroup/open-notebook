@@ -295,6 +295,7 @@ export const enUS = {
     allSourcesDescShort: "View all your sources here.",
     cannotSaveNoteNoNotebook: "Cannot save note: notebook ID not available",
     createFirstSource: "Add your first source to start building your knowledge base.",
+    dropFilesToAdd: "Drop files to add sources",
     deleteSourceConfirm: "Are you sure you want to delete this source?",
     deleteConfirm: "Are you sure you want to delete this?",
     deleteConfirmWithTitle: "Are you sure you want to delete \"{title}\"?",
